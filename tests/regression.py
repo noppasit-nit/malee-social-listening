@@ -152,7 +152,7 @@ async def main():
             return T
         T=drv();up=sorted([(g,p) for (sd,g),p in T.items() if sd=='up'],key=lambda x:-x[1]);dn=sorted([(g,p) for (sd,g),p in T.items() if sd=='dn'],key=lambda x:x[1])
         ok(abs(50+sum(T.values())-sc)<=0.5,f'contributions add up to score (50{sum(T.values()):+.2f} = {50+sum(T.values()):.2f} vs {sc})')
-        ok(await pg.locator('#why h3').text_content()==f'Why {sc}? · ทำไมได้คะแนนนี้','why heading shows score')
+        ok(await pg.locator('#why h3').text_content()==f'Why {sc}?','why heading shows score')
         rows_up=await pg.eval_on_selector_all('#why .wcol.up .drow','e=>e.map(x=>[x.dataset.tag,+x.dataset.pts])')
         rows_dn=await pg.eval_on_selector_all('#why .wcol.dn .drow','e=>e.map(x=>[x.dataset.tag,+x.dataset.pts])')
         ok([g for g,_ in rows_up]==[g for g,_ in up[:3]] and all(abs(a[1]-b2[1])<1e-3 for a,b2 in zip(rows_up,up)),f'pushing-up drivers match independent calc {rows_up}')
@@ -166,7 +166,68 @@ async def main():
         ok(await cnt(pg)==sum(1 for r in D if 'Malee' in r['brand'] and r['sentiment']=='neg' and tg in r['tags']),f'driver link filters feed ({tg}, negative)')
         await reset(pg)
         pt=await b.new_page();await pt.goto(URL+'?today=2028-01-01',wait_until='networkidle');T2=drv('2028-01-01')
-        ok(abs(50+sum(T2.values())-int(await pt.text_content('#gScore')))<=0.5 and (await pt.locator('#why h3').text_content()).startswith('Why '+await pt.text_content('#gScore')),'drivers respect ?today=');await pt.close()
+        ok(abs(50+sum(T2.values())-int(await pt.text_content('#gScore')))<=0.5 and (await pt.locator('#why h3').text_content())==('Why '+await pt.text_content('#gScore')+'?'),'drivers respect ?today=');await pt.close()
+        # ---- brand switcher: every brand vs independent calc ----
+        def hsb(brand,t=today,mx=None):
+            rows=[r for r in D if brand in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))];num=den=0;T={}
+            for r in rows:
+                w=RW[bk(ag(r,t))];sev=r['sentiment']=='neg' and r['complaint'] and r.get('severity')=='High'
+                v={'pos':1,'neu':0}.get(r['sentiment'],-2 if sev else -1);num+=w*v;den+=w*(2 if sev else 1)
+            for r in rows:
+                w=RW[bk(ag(r,t))];sev=r['sentiment']=='neg' and r['complaint'] and r.get('severity')=='High'
+                v={'pos':1,'neu':0}.get(r['sentiment'],-2 if sev else -1)
+                if not v: continue
+                tags=r['tags'] or ['(untagged)']
+                for g in tags:T[('up' if v>0 else 'dn',g)]=T.get(('up' if v>0 else 'dn',g),0)+50*w*v/den/len(tags)
+            return len(rows),(int(50+50*num/den+.5) if den else None),T
+        await pg.evaluate("localStorage.removeItem('malee-sl-v1')");await pg.reload(wait_until='networkidle');await pg.wait_for_timeout(400)
+        for br in ['Malee','Tipco','Doi Kham','if','Cocomax','Chaokoh']:
+            await pg.select_option('#hBrand',br);await pg.wait_for_timeout(150)
+            n_,s_,T_=hsb(br);n30,s30_,_=hsb(br,mx=30)
+            up_=sorted([(g,p) for (sd,g),p in T_.items() if sd=='up'],key=lambda x:-x[1])[:3];dn_=sorted([(g,p) for (sd,g),p in T_.items() if sd=='dn'],key=lambda x:x[1])[:3]
+            gu=await pg.eval_on_selector_all('#why .wcol.up .drow','e=>e.map(x=>[x.dataset.tag,+x.dataset.pts])');gd=await pg.eval_on_selector_all('#why .wcol.dn .drow','e=>e.map(x=>[x.dataset.tag,+x.dataset.pts])')
+            okb=(await pg.text_content('#gScore')==str(s_) and await pg.get_attribute('#health','data-brand')==br and abs(50+sum(T_.values())-s_)<=0.5
+                 and [g for g,_ in gu]==[g for g,_ in up_] and [g for g,_ in gd]==[g for g,_ in dn_] and all(abs(a[1]-c[1])<1e-3 for a,c in zip(gu+gd,up_+dn_))
+                 and (await pg.is_visible('#hLow'))==(n_<10) and br in await pg.text_content('#hTitle'))
+            t30=await pg.text_content('#why30');tr=await pg.text_content('#hTr')
+            ok30=('not enough recent data' in t30 and 'n/a' in tr) if n30<3 else (f'30-day score {s30_} vs {s_}' in t30 and str(s30_) in tr)
+            sevb=sum(1 for r in D if br in r['brand'] and r['complaint'] and r.get('severity')=='High')
+            ok(okb and ok30 and await pg.text_content('#hSev')==str(sevb) and await pg.get_attribute(f'#hComp tr[data-brand="{br}"]','aria-pressed')=='true',f'brand {br}: score {s_} n={n_} 30d {s30_}(n={n30}) up {[g for g,_ in up_]} down {[g for g,_ in dn_]}')
+            if br=='Tipco':
+                dl=pg.locator('#why .wcol.dn .dlink').first;tg=await dl.get_attribute('data-tag');await dl.click();await pg.wait_for_timeout(300)
+                ok(await pg.input_value('#fBrand')=='Tipco' and await cnt(pg)==sum(1 for r in D if 'Tipco' in r['brand'] and r['sentiment']=='neg' and tg in r['tags']),'feed link filters to the selected brand')
+                await reset(pg)
+        ok('brand=Chaokoh' in pg.url,'brand choice in URL')
+        await pg.click('#hComp tr[data-brand="Doi Kham"]');await pg.wait_for_timeout(150);ok(await pg.input_value('#hBrand')=='Doi Kham','clicking strip selects brand')
+        await pg.goto(URL,wait_until='networkidle');await pg.wait_for_timeout(300);ok(await pg.input_value('#hBrand')=='Doi Kham','brand persists in localStorage')
+        await pg.select_option('#hBrand','Malee');await pg.wait_for_timeout(100)
+        pq=await b.new_page();await pq.goto(URL+'?brand=Cocomax',wait_until='networkidle');ok(await pq.input_value('#hBrand')=='Cocomax' and await pq.text_content('#gScore')==str(hsb('Cocomax')[1]),'?brand= works');
+        await pq.goto(URL+'?brand=Nope',wait_until='networkidle');ok(await pq.input_value('#hBrand') in ['Cocomax','Malee'],'invalid ?brand= ignored');await pq.close()
+        # ---- language ----
+        WL=set("""Malee Coco Tipco Doi Kham Cocomax Chaokoh Pantip Google Facebook Instagram Lemon8 TikTok YouTube LINE Teams API CSV KPI PETA Thai PBS TCC ISRA News CIRA QR SOP CRM DM QA PR IT R&D CSR FDA UHT NFC PDPA UTC Grok Bot GitHub Actions Meta Graph Research Business Profile Shopee Lazada OA Wisesight Zocial Eye Mandala Brandwatch Talkwalker Meltwater CrowdTangle Thansettakij Post Today The Thaiger TrueID Shorts data json mentions csv MOCK Plus Eleven Matcha UK EN Lemon Maps""".split())
+        async def leftovers(pp):
+            return await pp.evaluate("""wl=>{const out=[];const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode()){const e=n.parentElement;if(!e||e.closest('.c,script,style,svg title,option:not(:checked)'))continue;if(!e.getClientRects().length)continue;const cs=getComputedStyle(e);if(cs.visibility==='hidden')continue;(n.textContent.match(/[A-Za-z][A-Za-z&]{2,}/g)||[]).forEach(t=>{if(!wl.includes(t))out.push(t)})}
+            document.querySelectorAll('[placeholder],[aria-label],select').forEach(e=>{let v=e.tagName==='SELECT'?(e.selectedOptions[0]||{}).text||'':(e.getAttribute('placeholder')||'')+' '+(e.getAttribute('aria-label')||'');v=v.replace(/\\bM[0-9a-f]{6}\\b/g,'');(v.match(/[A-Za-z][A-Za-z&]{2,}/g)||[]).forEach(t=>{if(!wl.includes(t))out.push('@'+t)})});return [...new Set(out)]}""",list(WL))
+        pl=await b.new_page(viewport={'width':1366,'height':900});el=[];pl.on('pageerror',lambda e:el.append(str(e)));pl.on('console',lambda m: el.append(m.text) if m.type=='error' else None)
+        await pl.goto(URL+'?lang=th',wait_until='networkidle');await pl.wait_for_timeout(600)
+        ok(await pl.evaluate('document.documentElement.lang')=='th' and 'แดชบอร์ด' in await pl.text_content('h1'),'?lang=th switches the page')
+        lo=await leftovers(pl);ok(not lo,f'no untranslated UI strings in TH mode {lo[:20]}')
+        ok((await pl.text_content('#gStatus')) in ['ดี','เฝ้าระวัง','เสี่ยง'] and 'ทำไม' in await pl.text_content('#why h3') and 'คะแนน 30 วัน' in await pl.text_content('#why30'),'TH gauge, why panel and 30-day note')
+        ok(await pl.text_content('#gScore')==str(sc),'score unchanged in TH')
+        await pl.click('.rc[data-rc="old"]');await pl.wait_for_timeout(150);lo2=await leftovers(pl);ok(not lo2,f'no untranslated strings with old items shown {lo2[:10]}')
+        await pl.fill('#fFrom','2030-01-01');await pl.dispatch_event('#fFrom','change');await pl.wait_for_timeout(150)
+        ok('ไม่มีการพูดถึง' in await pl.text_content('#feedBox') and 'ไม่มีคำร้องเรียน' in await pl.text_content('#cBody'),'TH empty states');lo3=await leftovers(pl);ok(not lo3,f'no untranslated strings in empty state {lo3[:10]}')
+        await pl.click('#reset');await pl.select_option('#hBrand','Chaokoh');await pl.wait_for_timeout(150);lo4=await leftovers(pl);ok(not lo4 and 'ข้อมูลล่าสุด' in await pl.text_content('#why30'),f'TH low-sample brand translated {lo4[:10]}')
+        await pl.select_option('#hBrand','Malee')
+        await pl.goto(URL,wait_until='networkidle');ok(await pl.evaluate('document.documentElement.lang')=='th','language persists in localStorage')
+        await pl.click('#lsw button[data-lang="en"]');await pl.wait_for_timeout(200);ok(await pl.evaluate('document.documentElement.lang')=='en' and 'Social Listening' in await pl.text_content('h1') and 'lang=' not in pl.url,'switch back to EN')
+        ok(not el,'no console errors in language tests '+str(el[:3]));await pl.close()
+        for lg in ['en','th']:
+            mm=await b.new_page(viewport={'width':375,'height':800},is_mobile=True);await mm.goto(URL+f'?lang={lg}',wait_until='networkidle');await mm.wait_for_timeout(500)
+            w_=await mm.evaluate("document.documentElement.scrollWidth");wd=await mm.evaluate("[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>377&&!e.closest('.tbl,.rrow')).map(e=>e.tagName+'.'+e.className).slice(0,5)")
+            ok(w_<=375 and not wd,f'no overflow at 375px in {lg} ({w_}) {wd}');await mm.close()
+        pt2=await b.new_page();await pt2.goto(URL+'?today=2028-01-01&lang=th&brand=Tipco',wait_until='networkidle')
+        ok(await pt2.text_content('#gScore')==str(hsb('Tipco','2028-01-01')[1]) and await pt2.evaluate('TODAY')=='2028-01-01','?today= works with ?lang and ?brand');await pt2.close()
         ok(not errs,'no console errors '+str(errs[:3]))
         # mobile overflow
         m=await b.new_page(viewport={'width':375,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
