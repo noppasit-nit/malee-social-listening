@@ -72,6 +72,13 @@ tr.is-old td{color:#8a949c}tr.is-old td a{color:#8a949c}
 .up{color:#14a05a}.dn{color:#d64545}.fl{color:var(--mut)}
 @media(max-width:980px){.health{grid-template-columns:1fr 1fr}.hc{grid-column:1/-1}}
 @media(max-width:640px){.hk>div:nth-child(3){grid-column:1/-1}.health{grid-template-columns:1fr;margin:-8px 10px 12px;padding:12px}.hk{grid-template-columns:1fr 1fr}.hk .v{font-size:18px}}
+.why{grid-column:1/-1;border-top:1px dashed var(--line);padding-top:12px}.why h3{margin:0 0 4px;font-size:15px}.why .sum{font-size:14px;margin:0 0 6px;line-height:1.5}.why .eq{font-size:12px;color:var(--mut);margin:0 0 10px}.why .eq b{color:var(--ink)}
+.wcols{display:grid;grid-template-columns:1fr 1fr;gap:12px}.wcol h4{margin:0 0 6px;font-size:13px}.wcol.up h4{color:#14a05a}.wcol.dn h4{color:#d64545}
+.drow{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:12px;min-width:0}.drow .t{display:flex;justify-content:space-between;gap:8px;font-weight:600;font-size:13px}.drow .pt{white-space:nowrap}.up .pt{color:#14a05a}.dn .pt{color:#d64545}
+.cbar{height:7px;border-radius:4px;background:#f0f2ef;margin:4px 0}.cbar i{display:block;height:100%;border-radius:4px}.up .cbar i{background:#14a05a}.dn .cbar i{background:#d64545}
+.drow .mx{color:var(--mut)}.drow .ex{margin-top:3px;overflow-wrap:anywhere}.drow .ex a{color:var(--ink)}.drow .fl2{font-weight:600}
+.w30{font-size:12.5px;background:#f6f8f4;border-radius:10px;padding:8px 10px;margin-top:6px}
+@media(max-width:640px){.wcols{grid-template-columns:1fr}.why .sum{font-size:13.5px}}
 </style>
 </head>
 <body>
@@ -105,6 +112,7 @@ tr.is-old td{color:#8a949c}tr.is-old td a{color:#8a949c}
 <div><div class="l">Last 30 days vs all time · 30 วัน</div><div class="v" id="hTr">–</div><div class="s" id="hTrT"></div></div>
 <div class="drv" id="hDrv"></div></div></div>
 <div class="hc"><p class="hh"><b>Same score for competitors</b><br>คะแนนเดียวกันของคู่แข่ง · n = mentions</p><table id="hComp"></table></div>
+<div class="why" id="why" aria-label="Why this score"></div>
 </div></section>
 
 <div class="filters"><div class="wrap"><div class="frow">
@@ -219,7 +227,36 @@ function health(brand,opt){opt=opt||{};let num=0,den=0;const rows=DATA.filter(r=
 for(const r of rows){const w=RW[bucket(rage(r))];const sev=r.sentiment==='neg'&&r.complaint&&r.severity==='High';const v=r.sentiment==='pos'?1:r.sentiment==='neg'?(sev?-2:-1):0;const m=sev?2:1;num+=w*v;den+=w*m}
 const c=k=>rows.filter(r=>r.sentiment===k).length;return {n:rows.length,score:den?Math.round(50+50*num/den):null,pos:c('pos'),neu:c('neu'),neg:c('neg')}}
 const band=s=>s==null?['fl','n/a']:s>=60?['ok','Healthy · ดี']:s>=40?['watch','Watch · เฝ้าระวัง']:['risk','At risk · เสี่ยง'];
-function renderHealth(){const H=health('Malee'),H30=health('Malee',{max:30});const s=H.score;
+function drivers(brand,opt){opt=opt||{};const rows=DATA.filter(r=>r.brand.includes(brand)&&(!opt.max||((a=>a!=null&&a<=opt.max)(rage(r)))));let den=0;
+const it=rows.map(r=>{const w=RW[bucket(rage(r))];const sev=r.sentiment==='neg'&&r.complaint&&r.severity==='High';const v=r.sentiment==='pos'?1:r.sentiment==='neg'?(sev?-2:-1):0;den+=w*(sev?2:1);return {r,w,v,b:bucket(rage(r))}});
+const T={};for(const x of it){if(!x.v)continue;const tags=x.r.tags.length?x.r.tags:['(untagged)'];const p=50*x.w*x.v/den/tags.length;for(const g of tags){const side=p>0?'up':'dn';const k=side+'|'+g;const o=T[k]=T[k]||{tag:g,side,pts:0,n:0,mix:{},ex:null,exv:0};o.pts+=p;o.n++;o.mix[x.b]=(o.mix[x.b]||0)+1;if(Math.abs(p)>o.exv){o.exv=Math.abs(p);o.ex=x.r}}}
+const L=Object.values(T);const up=L.filter(o=>o.side==='up').sort((a,b)=>b.pts-a.pts),dn=L.filter(o=>o.side==='dn').sort((a,b)=>a.pts-b.pts);
+const raw=den?50+L.reduce((a,o)=>a+o.pts,0):null;return {up,dn,raw,score:raw==null?null:Math.round(raw),n:rows.length}}
+const tl=g=>g==='(untagged)'?'Untagged · ไม่มีแท็ก':(TL[g]||g);const tl1=g=>tl(g).split(' · ')[0].toLowerCase();
+const MIXL={new:'NEW',recent:'Recent',year:'This year',old:'Old',unk:'Date unknown'};
+function renderWhy(){const A=drivers('Malee'),B=drivers('Malee',{max:30});if(A.score==null){$('why').innerHTML='';return}
+const [,bl]=band(A.score);const sumP=a=>a.reduce((x,o)=>x+o.pts,0);const U=sumP(A.up),Dn=sumP(A.dn);
+const fmtp=x=>(x>=0?'+':'−')+Math.abs(x).toFixed(1);const oldShare=o=>((o.mix.old||0)+(o.mix.unk||0))/o.n;const d0=A.dn[0],d1=A.dn[1];
+const dd=o=>tl1(o.tag)+(oldShare(o)>=.5?' (mostly old)':((o.mix.new||0)+(o.mix.recent||0))/o.n>=.5?' (mostly recent)':'');
+const oldD=A.dn.filter(o=>oldShare(o)>=.5)[0];
+const sum=`Score is <b>${bl.split(' · ')[0]} (${A.score})</b> mainly because positive Malee mentions outweigh negatives (${fmtp(U)} vs ${fmtp(Dn)} pts), led by positive ${A.up.slice(0,2).map(o=>tl1(o.tag)).join(' and ')||'—'} mentions${A.dn.length?`; held back by negative ${[d0,d1].filter(Boolean).map(dd).join(' and ')} mentions`:''}.${oldD?` Older ${tl1(oldD.tag)} cases are mostly Old, so they weigh little (×0.1).`:''}`;
+const fmt=x=>(x>=0?'+':'−')+Math.abs(x).toFixed(1);const mx=Math.max(...[...A.up.slice(0,3),...A.dn.slice(0,3)].map(o=>Math.abs(o.pts)),1);
+const row=o=>{const mix=Object.keys(MIXL).filter(k=>o.mix[k]).map(k=>`${o.mix[k]} ${MIXL[k]}`).join(' · ');const e=o.ex;
+return `<div class="drow" data-tag="${esc(o.tag)}" data-pts="${o.pts.toFixed(3)}"><div class="t"><span>${esc(tl(o.tag))}</span><span class="pt">${fmt(o.pts)} pts</span></div><div class="cbar"><i style="width:${Math.abs(o.pts)/mx*100}%"></i></div>
+<div class="mx">${o.n} ${o.side==='up'?'positive':'negative'} mention${o.n>1?'s':''} · ${mix}</div>
+<div class="ex">e.g. <a href="${esc(e.url)}" target="_blank" rel="noopener">“${esc((e.en||e.text).slice(0,90))}${(e.en||e.text).length>90?'…':''}” — ${esc(e.platform)} ${e.date.slice(0,10)} ↗</a> ${rbadge(e.date,undated(e))}</div>
+${o.tag==='(untagged)'?'':`<a href="#feed" class="fl2 dlink" data-tag="${esc(o.tag)}" data-sent="${o.side==='up'?'pos':'neg'}">Show in feed ↓</a>`}</div>`};
+const rest=(a,k)=>{const r=sumP(a.slice(3));return a.length>3?`<div class="mx" style="font-size:12px">Other ${k} themes: ${fmt(r)} pts (${a.length-3} more)</div>`:''};
+// 30-day note
+let w30='';if(B.score==null||B.n<3){w30=`Last 30 days: too few Malee mentions (n=${B.n}) to compare.`}else{const m=(D,k)=>{const o={};[...D.up,...D.dn].forEach(x=>{o[x.tag]=(o[x.tag]||0)+x.pts});return o};const ma=m(A),mb=m(B);const tags=[...new Set([...Object.keys(ma),...Object.keys(mb)])];
+const ch=tags.map(g=>[g,(mb[g]||0)-(ma[g]||0)]).filter(x=>Math.abs(x[1])>=.5).sort((a,b)=>a[1]-b[1]);const neg=ch.filter(x=>x[1]<0).slice(0,2),pos=ch.filter(x=>x[1]>0).reverse().slice(0,2);const dlt=B.score-A.score;
+w30=`<b>30-day score ${B.score} vs ${A.score} all time (${dlt>0?'+':dlt<0?'−':''}${Math.abs(dlt)}):</b> ${neg.length?'lower because '+neg.map(([g,v])=>`${tl1(g)} (${fmt(v)} pts)`).join(' and '):'no theme pulled it down much'}${pos.length?'; partly offset by '+pos.map(([g,v])=>`${tl1(g)} (${fmt(v)})`).join(' and '):''}. Based on ${B.n} mentions from the last 30 days; older items drop out of this window.`}
+$('why').innerHTML=`<h3>Why ${A.score}? · ทำไมได้คะแนนนี้</h3><p class="sum" id="whySum">${sum}</p>
+<p class="eq" id="whyEq">How it adds up: <b>50</b> baseline <b class="up">${fmt(U)}</b> pushing up <b class="dn">${fmt(Dn)}</b> pulling down = <b>${(50+U+Dn).toFixed(1)}</b> → ${A.score}. Each mention's points are split equally across its tags; neutral mentions add 0 but still count in the total.</p>
+<div class="wcols"><div class="wcol up"><h4>▲ Pushing up · ดันคะแนนขึ้น</h4>${A.up.slice(0,3).map(row).join('')}${rest(A.up,'positive')}</div><div class="wcol dn"><h4>▼ Pulling down · ฉุดคะแนนลง</h4>${A.dn.slice(0,3).map(row).join('')||'<div class="mx">No negative Malee mentions.</div>'}${rest(A.dn,'negative')}</div></div>
+<div class="w30" id="why30">${w30}</div>`;
+$('why').querySelectorAll('.dlink').forEach(a=>a.onclick=e=>{e.preventDefault();$('reset').click();$('fBrand').value='Malee';$('fSent').value=a.dataset.sent;$('fTopic').value=a.dataset.tag;render();$('feed').scrollIntoView({behavior:'smooth'})})}
+function renderHealth(){renderWhy();const H=health('Malee'),H30=health('Malee',{max:30});const s=H.score;
 $('gScore').textContent=s??'–';$('gNeedle').setAttribute('transform',`rotate(${((s??50)-50)*1.8} 100 100)`);const [bk,bl]=band(s);$('gStatus').className='hs '+bk;$('gStatus').textContent=bl;$('health').dataset.score=s;
 const t=H.n||1;$('hSplit').innerHTML=`<i style="width:${H.pos/t*100}%;background:#14a05a"></i><i style="width:${H.neu/t*100}%;background:#b8c1ca"></i><i style="width:${H.neg/t*100}%;background:#d64545"></i>`;
 $('hSplitT').textContent=`${Math.round(H.pos/t*100)}% pos · ${Math.round(H.neu/t*100)}% neu · ${Math.round(H.neg/t*100)}% neg (n=${H.n})`;

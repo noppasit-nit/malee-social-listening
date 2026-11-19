@@ -138,6 +138,35 @@ async def main():
         await reset(pg)
         pt=await b.new_page();await pt.goto(URL+'?today=2028-01-01',wait_until='networkidle')
         ok(await pt.text_content('#gScore')==str(hs('Malee','2028-01-01')[1]),'gauge respects ?today= override');await pt.close()
+        # ---- Why this score (drivers) ----
+        def drv(t=today,mx=None):
+            rows=[r for r in D if 'Malee' in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))];den=0;items=[]
+            for r in rows:
+                w=RW[bk(ag(r,t))];sev=r['sentiment']=='neg' and r['complaint'] and r.get('severity')=='High'
+                v={'pos':1,'neu':0}.get(r['sentiment'],-2 if sev else -1);den+=w*(2 if sev else 1);items.append((r,w,v))
+            T={}
+            for r,w,v in items:
+                if not v: continue
+                tags=r['tags'] or ['(untagged)']
+                for g in tags: T[('up' if v>0 else 'dn',g)]=T.get(('up' if v>0 else 'dn',g),0)+50*w*v/den/len(tags)
+            return T
+        T=drv();up=sorted([(g,p) for (sd,g),p in T.items() if sd=='up'],key=lambda x:-x[1]);dn=sorted([(g,p) for (sd,g),p in T.items() if sd=='dn'],key=lambda x:x[1])
+        ok(abs(50+sum(T.values())-sc)<=0.5,f'contributions add up to score (50{sum(T.values()):+.2f} = {50+sum(T.values()):.2f} vs {sc})')
+        ok(await pg.locator('#why h3').text_content()==f'Why {sc}? · ทำไมได้คะแนนนี้','why heading shows score')
+        rows_up=await pg.eval_on_selector_all('#why .wcol.up .drow','e=>e.map(x=>[x.dataset.tag,+x.dataset.pts])')
+        rows_dn=await pg.eval_on_selector_all('#why .wcol.dn .drow','e=>e.map(x=>[x.dataset.tag,+x.dataset.pts])')
+        ok([g for g,_ in rows_up]==[g for g,_ in up[:3]] and all(abs(a[1]-b2[1])<1e-3 for a,b2 in zip(rows_up,up)),f'pushing-up drivers match independent calc {rows_up}')
+        ok([g for g,_ in rows_dn]==[g for g,_ in dn[:3]] and all(abs(a[1]-b2[1])<1e-3 for a,b2 in zip(rows_dn,dn)),f'pulling-down drivers match independent calc {rows_dn}')
+        eq=await pg.text_content('#whyEq');U=sum(p for _,p in up);Dn=sum(p for _,p in dn)
+        ok(f'{abs(U):.1f}' in eq and f'{abs(Dn):.1f}' in eq and f'{50+U+Dn:.1f}' in eq,'equation line shows the sums')
+        ok(await pg.locator('#why .drow .ex a[href^="https://"]').count()==len(rows_up)+len(rows_dn),'each driver has a linked example')
+        T30=drv(mx=30);s30x=round(50+sum(T30.values())) if T30 else None
+        ok(f'30-day score {s30} vs {sc}' in await pg.text_content('#why30') and s30x==s30,'30-day note matches 30-day score')
+        dl=pg.locator('#why .wcol.dn .dlink').first;tg=await dl.get_attribute('data-tag');await dl.click();await pg.wait_for_timeout(300)
+        ok(await cnt(pg)==sum(1 for r in D if 'Malee' in r['brand'] and r['sentiment']=='neg' and tg in r['tags']),f'driver link filters feed ({tg}, negative)')
+        await reset(pg)
+        pt=await b.new_page();await pt.goto(URL+'?today=2028-01-01',wait_until='networkidle');T2=drv('2028-01-01')
+        ok(abs(50+sum(T2.values())-int(await pt.text_content('#gScore')))<=0.5 and (await pt.locator('#why h3').text_content()).startswith('Why '+await pt.text_content('#gScore')),'drivers respect ?today=');await pt.close()
         ok(not errs,'no console errors '+str(errs[:3]))
         # mobile overflow
         m=await b.new_page(viewport={'width':375,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
