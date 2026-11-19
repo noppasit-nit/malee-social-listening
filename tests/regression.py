@@ -102,11 +102,47 @@ async def main():
         ok(await pg.locator('#legend .rb').count()==5,'legend shows all 5 labels')
         pt=await b.new_page();await pt.goto(URL+'?today=2026-11-26',wait_until='networkidle')
         ok(await pt.evaluate('TODAY')=='2026-11-26' and await pt.text_content('#kW')==str(sum(1 for r in D if ag(r,'2026-11-26') is not None and ag(r,'2026-11-26')<=7)),'labels recompute for another date (?today=)');await pt.close()
+        # ---- Malee health gauge ----
+        RW={'new':1,'recent':.75,'year':.4,'old':.1,'unk':.1}
+        def bk(a): return 'unk' if a is None else 'new' if a<=7 else 'recent' if a<=30 else 'year' if a<=365 else 'old'
+        def hs(brand,t=today,mx=None):
+            num=den=0;rows=[r for r in D if brand in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))]
+            for r in rows:
+                w=RW[bk(ag(r,t))];sev=r['sentiment']=='neg' and r['complaint'] and r.get('severity')=='High'
+                v={'pos':1,'neu':0}.get(r['sentiment'],-2 if sev else -1);num+=w*v;den+=w*(2 if sev else 1)
+            return len(rows),(int(50+50*num/den+.5) if den else None)
+        def bandp(x): return 'Healthy' if x>=60 else 'Watch' if x>=40 else 'At risk'
+        await reset(pg);await pg.evaluate("localStorage.removeItem('malee-sl-v1')");await pg.reload(wait_until='networkidle');await pg.wait_for_timeout(400)
+        n,sc=hs('Malee')
+        ok(await pg.text_content('#gScore')==str(sc),f'gauge score matches formula ({sc}, n={n})')
+        ok((await pg.text_content('#gStatus')).startswith(bandp(sc)),'gauge status band '+bandp(sc))
+        ok(abs(float(re.search(r'rotate\(([-\d.e]+)',await pg.get_attribute('#gNeedle','transform')).group(1))-(sc-50)*1.8)<.01,'needle angle matches score')
+        ok(await pg.evaluate("[band(60)[0],band(59)[0],band(40)[0],band(39)[0],band(null)[0]]")==['ok','watch','watch','risk','fl'],'band boundaries 60/40')
+        ok(await pg.evaluate("health('Malee').n")==n,'gauge uses only Malee mentions')
+        for b2 in ['Tipco','Doi Kham','if','Cocomax','Chaokoh']:
+            n2,s2=hs(b2);row=pg.locator(f'#hComp tr[data-brand="{b2}"]')
+            ok(await row.get_attribute('data-score')==str(s2) and f'n={n2}' in await row.text_content() and (('low sample' in await row.text_content())==(n2<10)),f'competitor {b2} score {s2} n={n2}')
+        n30,s30=hs('Malee',mx=30);tr=await pg.text_content('#hTr')
+        ok(str(s30) in tr and (('▲' in tr) if s30-sc>3 else ('▼' in tr) if s30-sc<-3 else ('►' in tr)),f'30-day trend {s30} vs {sc}: {tr}')
+        sevn=sum(1 for r in D if 'Malee' in r['brand'] and r['complaint'] and r.get('severity')=='High')
+        ok(await pg.text_content('#hSev')==str(sevn),f'severe open issues {sevn}')
+        sel=pg.locator('#cBody tr:has-text("Malee") select[data-k=status]');k=0
+        for i in range(await sel.count()):
+            rid=await sel.nth(i).get_attribute('data-id');rr=[r for r in D if r['id']==rid][0]
+            if rr.get('severity')=='High':await sel.nth(i).select_option('Closed');k=1;break
+        if k: ok(await pg.text_content('#hSev')==str(sevn-1),'closing a severe issue lowers the count')
+        await pg.evaluate("localStorage.removeItem('malee-sl-v1')")
+        ok(await pg.locator('#health details.how summary').count()==1,'formula expander present')
+        await pg.click('#hDrvA');await pg.wait_for_timeout(300);tag=await pg.get_attribute('#hDrvA','data-tag')
+        ok(await cnt(pg)==sum(1 for r in D if 'Malee' in r['brand'] and r['sentiment']=='neg' and tag in r['tags']) and await pg.input_value('#fTopic')==tag,f'main driver link filters feed to {tag}')
+        await reset(pg)
+        pt=await b.new_page();await pt.goto(URL+'?today=2028-01-01',wait_until='networkidle')
+        ok(await pt.text_content('#gScore')==str(hs('Malee','2028-01-01')[1]),'gauge respects ?today= override');await pt.close()
         ok(not errs,'no console errors '+str(errs[:3]))
         # mobile overflow
-        m=await b.new_page(viewport={'width':360,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
-        ow=await m.evaluate("document.documentElement.scrollWidth");ok(await m.locator('.rc').count()==5,'recency chips on mobile');ok(ow<=360,f'no horizontal overflow at 360px (scrollWidth {ow})')
-        wide=await m.evaluate("[...document.querySelectorAll('main *')].filter(e=>e.getBoundingClientRect().right>362&&!e.closest('.tbl')).length");ok(wide==0,f'no element wider than viewport outside scroll tables ({wide})')
+        m=await b.new_page(viewport={'width':375,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
+        ow=await m.evaluate("document.documentElement.scrollWidth");ok(await m.locator('.rc').count()==5,'recency chips on mobile');ok(ow<=375 and await m.locator('#health svg').is_visible(),f'gauge visible, no horizontal overflow at 375px (scrollWidth {ow})')
+        wide=await m.evaluate("[...document.querySelectorAll('main *')].filter(e=>e.getBoundingClientRect().right>377&&!e.closest('.tbl')).length");ok(wide==0,f'no element wider than viewport outside scroll tables ({wide})')
         await b.close()
     print(f'\n{len(fails)} failure(s)');sys.exit(1 if fails else 0)
 asyncio.run(main())

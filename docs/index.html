@@ -61,6 +61,17 @@ tr.is-old td{color:#8a949c}tr.is-old td a{color:#8a949c}
 #recs a[data-d]+.rb{margin-left:3px}
 .kpi.knew .v{color:#e11d48}
 @media(max-width:640px){.rrow{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;margin-left:-2px}.rc{flex:0 0 auto}.sortl{margin-left:0;flex:1 1 100%!important}.legend{font-size:11.5px;gap:6px 10px}.kpis{grid-template-columns:repeat(2,1fr)}}
+.health{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin:-10px auto 14px;padding:14px 16px;display:grid;grid-template-columns:minmax(220px,280px) 1fr minmax(240px,330px);gap:16px;align-items:start;position:relative;z-index:2;box-shadow:0 4px 16px rgba(0,0,0,.06)}
+.hg{text-align:center}.hg svg{width:100%;max-width:260px;height:auto;display:block;margin:0 auto}.hg .hs{font-size:13px;font-weight:700;border-radius:999px;padding:2px 12px;display:inline-block;color:#fff}.hs.ok{background:#14a05a}.hs.watch{background:#f59e0b}.hs.risk{background:#d64545}
+.hh{font-size:12px;color:var(--mut);margin:0 0 6px}.hh b{color:var(--ink);font-size:14px}
+.hk{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.hk>div{border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}.hk .l{font-size:11px;color:var(--mut)}.hk .v{font-size:20px;font-weight:700}.hk .s{font-size:11px;color:var(--mut)}
+.split{display:flex;height:10px;border-radius:6px;overflow:hidden;margin:6px 0 3px;background:#eee}.split i{display:block}
+.drv{grid-column:1/-1;font-size:13px;background:#fff6f6;border:1px solid #f6d4d4!important}.drv a{font-weight:600}
+.hc{font-size:12px}.hc table{width:100%;border-collapse:collapse}.hc td{padding:4px 3px;white-space:nowrap;border-bottom:1px solid var(--line);vertical-align:middle}.hc td.n{color:var(--mut);white-space:nowrap}.hc .bar{height:6px;border-radius:4px;background:#eee;position:relative;min-width:50px}.hc .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}.hc .low{font-size:10px;color:#9a6a00;background:#fff4d6;border-radius:4px;padding:0 4px;white-space:nowrap}
+.how{font-size:12px;color:var(--mut);margin-top:8px;text-align:left}.how summary{cursor:pointer;color:var(--g);font-weight:600}.how ul{margin:4px 0 0;padding-left:18px}
+.up{color:#14a05a}.dn{color:#d64545}.fl{color:var(--mut)}
+@media(max-width:980px){.health{grid-template-columns:1fr 1fr}.hc{grid-column:1/-1}}
+@media(max-width:640px){.hk>div:nth-child(3){grid-column:1/-1}.health{grid-template-columns:1fr;margin:-8px 10px 12px;padding:12px}.hk{grid-template-columns:1fr 1fr}.hk .v{font-size:18px}}
 </style>
 </head>
 <body>
@@ -70,6 +81,31 @@ tr.is-old td{color:#8a949c}tr.is-old td a{color:#8a949c}
 <div class="badges"><span class="badge">MOCK-UP v1</span><span class="badge">135 real public mentions · 0 sample</span><span class="badge">Collected 19 Nov 2026 (Bangkok time, UTC+7)</span><span class="badge">X · Pantip · Google · Facebook · Instagram · Lemon8 · Video · TikTok (limited)</span></div>
 <nav class="jump"><a href="#kpi">Overview</a><a href="#recs">Recommendations</a><a href="#alerts">Alerts</a><a href="#charts">Charts</a><a href="#complaints">Complaints</a><a href="#feed">Mentions</a><a href="#platforms">Platforms</a><a href="#method">Methodology</a></nav>
 </div></header>
+<section class="wrap" id="healthWrap" aria-label="Malee brand health"><div class="health" id="health">
+<div class="hg"><p class="hh"><b>Malee Sentiment Health</b><br>สุขภาพแบรนด์มาลี (0–100)</p>
+<svg viewBox="0 0 200 142" role="img" aria-labelledby="gTitle"><title id="gTitle">Malee sentiment health gauge</title>
+<path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#eceeea" stroke-width="18"/>
+<path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#d64545" stroke-width="18" pathLength="100" stroke-dasharray="40 100"/>
+<path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#f59e0b" stroke-width="18" pathLength="100" stroke-dasharray="0 40 20 100"/>
+<path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#14a05a" stroke-width="18" pathLength="100" stroke-dasharray="0 60 40 100"/>
+<g id="gNeedle"><line x1="100" y1="100" x2="100" y2="38" stroke="#1f2a24" stroke-width="4" stroke-linecap="round"/></g><circle cx="100" cy="100" r="7" fill="#1f2a24"/>
+<text x="100" y="136" text-anchor="middle" font-size="28" font-weight="700" fill="#1f2a24" id="gScore">–</text>
+<text x="20" y="116" text-anchor="middle" font-size="9" fill="#6b7280">0</text><text x="180" y="116" text-anchor="middle" font-size="9" fill="#6b7280">100</text></svg>
+<span class="hs" id="gStatus">–</span>
+<details class="how"><summary>How this is calculated · วิธีคำนวณ</summary><ul>
+<li>Uses only mentions tagged <b>Malee</b> in data.json (all filters ignored).</li>
+<li>Each mention scores +1 positive, 0 neutral, −1 negative. A <b>High-severity complaint</b> scores −2 and counts double.</li>
+<li>Recency weight: NEW ×1, Recent ×0.75, This year ×0.4, Old ×0.1, Date unknown ×0.1, so 2013-era issues barely move the score.</li>
+<li>Score = 50 + 50 × (Σ weight×score) ÷ (Σ weight×max). 100 = all positive, 50 = balanced, 0 = all severe.</li>
+<li>Bands: ≥60 Healthy · 40–59 Watch · &lt;40 At risk. Last-30-days score uses only mentions ≤30 days old.</li>
+<li>Ages are counted from today (Bangkok time). It's a mock-up indicator from public posts, not a survey.</li></ul></details></div>
+<div><div class="hk">
+<div><div class="l">Malee sentiment split · สัดส่วน</div><div class="split" id="hSplit"></div><div class="s" id="hSplitT"></div></div>
+<div><div class="l">Severe open issues · ประเด็นร้ายแรง</div><div class="v" id="hSev">–</div><div class="s" id="hSevT"></div></div>
+<div><div class="l">Last 30 days vs all time · 30 วัน</div><div class="v" id="hTr">–</div><div class="s" id="hTrT"></div></div>
+<div class="drv" id="hDrv"></div></div></div>
+<div class="hc"><p class="hh"><b>Same score for competitors</b><br>คะแนนเดียวกันของคู่แข่ง · n = mentions</p><table id="hComp"></table></div>
+</div></section>
 
 <div class="filters"><div class="wrap"><div class="frow">
 <label>Brand · แบรนด์<select id="fBrand"></select></label>
@@ -178,6 +214,22 @@ const rage=r=>undated(r)?null:age(r.date);
 function bucket(a){return a==null?'unk':a<=7?'new':a<=30?'recent':a<=365?'year':'old'}
 function rbadge(d,unk){const a=unk?null:age(d),b=bucket(a);const t={new:'NEW',recent:'Recent',year:'This year',old:'Old · '+String(d).slice(0,4),unk:'Date unknown'}[b];return `<span class="rb rb-${b}" title="${a==null?'No reliable date':a+' days before '+TODAY}">${t}</span>`}
 function relt(a,approx){if(a==null)return '';const p=approx?'~':'';if(a===0)return p+'today';if(a===1)return p+'yesterday';if(a<30)return p+a+' days ago';if(a<365){const m=Math.floor(a/30);return p+m+(m===1?' month':' months')+' ago'}const y=Math.floor(a/365);return p+y+(y===1?' year':' years')+' ago'}
+const RW={new:1,recent:.75,year:.4,old:.1,unk:.1};
+function health(brand,opt){opt=opt||{};let num=0,den=0;const rows=DATA.filter(r=>r.brand.includes(brand)&&(!opt.max||((a=>a!=null&&a<=opt.max)(rage(r)))));
+for(const r of rows){const w=RW[bucket(rage(r))];const sev=r.sentiment==='neg'&&r.complaint&&r.severity==='High';const v=r.sentiment==='pos'?1:r.sentiment==='neg'?(sev?-2:-1):0;const m=sev?2:1;num+=w*v;den+=w*m}
+const c=k=>rows.filter(r=>r.sentiment===k).length;return {n:rows.length,score:den?Math.round(50+50*num/den):null,pos:c('pos'),neu:c('neu'),neg:c('neg')}}
+const band=s=>s==null?['fl','n/a']:s>=60?['ok','Healthy · ดี']:s>=40?['watch','Watch · เฝ้าระวัง']:['risk','At risk · เสี่ยง'];
+function renderHealth(){const H=health('Malee'),H30=health('Malee',{max:30});const s=H.score;
+$('gScore').textContent=s??'–';$('gNeedle').setAttribute('transform',`rotate(${((s??50)-50)*1.8} 100 100)`);const [bk,bl]=band(s);$('gStatus').className='hs '+bk;$('gStatus').textContent=bl;$('health').dataset.score=s;
+const t=H.n||1;$('hSplit').innerHTML=`<i style="width:${H.pos/t*100}%;background:#14a05a"></i><i style="width:${H.neu/t*100}%;background:#b8c1ca"></i><i style="width:${H.neg/t*100}%;background:#d64545"></i>`;
+$('hSplitT').textContent=`${Math.round(H.pos/t*100)}% pos · ${Math.round(H.neu/t*100)}% neu · ${Math.round(H.neg/t*100)}% neg (n=${H.n})`;
+const sev=DATA.filter(r=>r.brand.includes('Malee')&&r.complaint&&r.severity==='High'&&((store[r.id]||{}).status||'New')!=='Closed');const sevY=sev.filter(r=>{const a=rage(r);return a!=null&&a<=365});
+$('hSev').textContent=sev.length;$('hSevT').textContent=`High-severity Malee complaints not marked Closed · ${sevY.length} from the last 12 months`;
+if(H30.score==null||H30.n<3){$('hTr').innerHTML='<span class="fl">n/a</span>';$('hTrT').textContent=`too few Malee mentions in 30 days (n=${H30.n})`}else{const d=H30.score-s;const [c,ar]=d>3?['up','▲']:d<-3?['dn','▼']:['fl','►'];$('hTr').innerHTML=`<span class="${c}">${ar} ${H30.score}</span>`;$('hTrT').textContent=`last 30d (n=${H30.n}) vs ${s} all time · ${d>0?'+':''}${d} pts`}
+const tw={};DATA.filter(r=>r.brand.includes('Malee')&&r.sentiment==='neg').forEach(r=>{const w=RW[bucket(rage(r))];r.tags.forEach(g=>{tw[g]=(tw[g]||0)+w})});const top=Object.entries(tw).sort((a,b)=>b[1]-a[1])[0];
+$('hDrv').innerHTML=top?`<b>Main driver · ประเด็นลบหลัก:</b> ${esc(TL[top[0]]||top[0])} — ${DATA.filter(r=>r.brand.includes('Malee')&&r.sentiment==='neg'&&r.tags.includes(top[0])).length} negative Malee mentions (recency-weighted top theme). <a href="#feed" id="hDrvA" data-tag="${esc(top[0])}">Show them in the feed ↓</a>`:'<b>Main driver:</b> no negative Malee mentions';
+const a=$('hDrvA');if(a)a.onclick=e=>{e.preventDefault();$('reset').click();$('fBrand').value='Malee';$('fSent').value='neg';$('fTopic').value=a.dataset.tag;render();$('feed').scrollIntoView({behavior:'smooth'})};
+$('hComp').innerHTML=['Malee','Tipco','Doi Kham','if','Cocomax','Chaokoh'].map(b=>{const h=health(b),[k,l]=band(h.score);const col={ok:'#14a05a',watch:'#f59e0b',risk:'#d64545',fl:'#b8c1ca'}[k];return `<tr data-brand="${esc(b)}" data-score="${h.score??''}"><td><b>${esc(b)}</b></td><td style="width:100%"><div class="bar"><i style="width:${h.score??0}%;background:${col}"></i></div></td><td><b>${h.score??'–'}</b></td><td class="n">n=${h.n} ${h.n<10?'<span class="low">low sample</span>':''}</td></tr>`}).join('')}
 let RC='';const inRC=(r,k)=>{const a=rage(r);if(!k)return true;if(k==='old')return a==null||a>365;return a!=null&&a<=+k};
 const sortR=R=>{const dir=$('fSort').value==='old'?1:-1;return [...R].sort((x,y)=>{const ux=undated(x),uy=undated(y);if(ux!==uy)return ux?1:-1;return dir*(Date.parse(x.date)-Date.parse(y.date))})};
 function filt(){const b=$('fBrand').value,p=$('fPlat').value,s=$('fSent').value,t=$('fTopic').value,f=$('fFrom').value,to=$('fTo').value,q=$('fQ').value.trim().toLowerCase(),c=$('fComp').checked;
@@ -222,7 +274,7 @@ const eth=c.filter(r=>r.tags.includes('ethics'));if(eth.length)a.push(['a-info',
 const neg=R.filter(r=>r.brand.includes('Malee')&&r.sentiment==='neg'&&r.date>='2026-10-01');if(neg.length)a.push(['a-med','🟠 Recent Malee negatives · ล่าสุด',`${neg.length} negative Malee mentions since 1 Oct 2026 (taste, price, ad creative). Review weekly.`,neg[0]]);
 $('alertBox').innerHTML=a.slice(0,6).map(([k,t,m,r])=>`<div class="alert ${k}"><b>${t}</b>${esc(m)}<div class="am">Example: <a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.platform)} · ${esc(r.date.slice(0,10))} ↗</a> ${rbadge(r.date,undated(r))}</div></div>`).join('')||'<div class="empty">No alerts for this filter.</div>'}
 function table(C){$('cBody').innerHTML=C.map(r=>{const s=store[r.id]||{};const st=s.status||'New',ow=s.owner||r.owner;const a=rage(r),b=bucket(a);return `<tr class="is-${b}"><td>${r.id}</td><td style="white-space:nowrap">${rbadge(r.date,undated(r))}<br>${r.date.slice(0,10)}<br><span class="rel">${relt(a,/^approx/.test(r.date_precision))}</span></td><td>${r.brand.join(', ')}</td><td>${esc(r.platform)}</td><td>${esc(r.en.slice(0,110))}${r.en.length>110?'…':''}<div class="chips">${r.tags.map(t=>`<span class="chip">${esc(t)}</span>`).join('')}</div></td><td><span class="sev ${r.severity}">${r.severity}</span></td><td><select aria-label="Owner for ${r.id}" data-id="${r.id}" data-k="owner">${OWNERS.map(o=>`<option${o===ow?' selected':''}>${o}</option>`).join('')}</select></td><td><select aria-label="Status for ${r.id}" class="st-${st}" data-id="${r.id}" data-k="status">${STAT.map(o=>`<option${o===st?' selected':''}>${o}</option>`).join('')}</select></td><td><a href="${esc(r.url)}" target="_blank" rel="noopener">Open ↗</a></td></tr>`}).join('')||'<tr><td colspan="9" class="empty">No complaints match the filters.</td></tr>';
-$('cBody').querySelectorAll('select').forEach(s=>s.onchange=()=>{const id=s.dataset.id;store[id]=store[id]||{};store[id][s.dataset.k]=s.value;save();if(s.dataset.k==='status')s.className='st-'+s.value})}
+$('cBody').querySelectorAll('select').forEach(s=>s.onchange=()=>{const id=s.dataset.id;store[id]=store[id]||{};store[id][s.dataset.k]=s.value;save();if(s.dataset.k==='status'){s.className='st-'+s.value;renderHealth()}})}
 let shown=12;function feed(R){const box=$('feedBox');box.innerHTML=R.slice(0,shown).map(r=>{const p=PC[r.platform]||['#999','?'];const th=r.lang==='th'||/[\u0E00-\u0E7F]/.test(r.text);const e=r.engagement||{};const eng=Object.entries(e).filter(([k,v])=>v).map(([k,v])=>`${k} ${Number(v).toLocaleString()}`).join(' · ');
 const a=rage(r),bk=bucket(a);return `<article class="m is-${bk}" data-age="${a==null?'':a}"><div class="mh"><span class="pi" style="background:${p[0]}">${p[1]}</span><div><b style="color:var(--ink)">${esc(r.author_display)}</b><br>${rbadge(r.date,undated(r))} ${esc(r.platform)} · ${esc(r.date.slice(0,16).replace('T',' '))} <span class="rel">· ${relt(a,/^approx/.test(r.date_precision))}</span>${r.date_precision!=='exact'&&r.date_precision!=='date'?' <i>('+esc(r.date_precision)+')</i>':''}</div></div>
 <div class="chips">${r.brand.map(b=>`<span class="chip b">${esc(b)}</span>`).join('')}<span class="sent ${r.sentiment}">${{pos:'Positive',neu:'Neutral',neg:'Negative'}[r.sentiment]}</span>${r.complaint?'<span class="chip c">Complaint</span>':''}${r.tags.map(t=>`<span class="chip">${esc(t)}</span>`).join('')}</div>
@@ -240,6 +292,6 @@ const blob=new Blob(['\ufeff'+cols.join(',')+'\n'+rows.join('\n')],{type:'text/c
 document.querySelectorAll('.rc').forEach(b=>b.onclick=()=>{RC=b.dataset.rc;document.querySelectorAll('.rc').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));shown=12;render()});
 $('fSort').onchange=()=>{shown=12;render()};
 document.querySelectorAll('#recs .rec').forEach(rec=>{const L=[...rec.querySelectorAll('a[data-d]')];L.forEach(a=>a.insertAdjacentHTML('afterend',' '+rbadge(a.dataset.d)));if(L.length){const d=L.map(a=>a.dataset.d).sort().pop();const ev=[...rec.querySelectorAll('p')].find(p=>/Evidence/.test(p.textContent));ev&&ev.insertAdjacentHTML('beforebegin',`<p class="rlatest">Latest evidence: ${d} ${rbadge(d)} <span class="rel">${relt(age(d))}</span></p>`)}});
-render();
+renderHealth();render();
 </script>
 </body></html>
