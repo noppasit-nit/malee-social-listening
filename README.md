@@ -7,3 +7,6 @@ All 136 mentions are real public posts/pages with source URLs, collected 19 Nov 
 Sentiment, topics and complaint flags are auto-classified (not human-verified). Complaint status/owner are stored in the browser (localStorage) only.
 
 Files: `docs/index.html` (dashboard, Chart.js via CDN), `docs/data.json`, `docs/mentions.csv`.
+
+## QA
+`python3 tests/regression.py [URL]` (Playwright + Chrome) checks filters, Thai search, date edges, empty state, CSV BOM and formula guard, saved status, corrupt localStorage, XSS escaping, labels, 360 px overflow, chart totals vs data.json.
