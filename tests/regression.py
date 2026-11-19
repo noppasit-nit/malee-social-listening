@@ -70,10 +70,42 @@ async def main():
         ok(await pg.evaluate("[...document.querySelectorAll('#kw > *')].every(e=>e.tagName==='BUTTON')"),'keyword chips are keyboard buttons')
         ok(await pg.evaluate("[...document.querySelectorAll('a[target=_blank]')].every(a=>/noopener/.test(a.rel))"),'external links use rel=noopener')
         ok(await pg.locator('#recs .rec').count()>=4,'recommendations section present')
+        # ---- recency labels ----
+        B=await pg.evaluate("[0,7,8,30,31,365,366,4000,null].map(bucket)")
+        ok(B==['new','new','recent','recent','year','year','old','old','unk'],'recency label boundaries 7/8/30/31/365/366 '+str(B))
+        ok('Old · 2013' in await pg.evaluate("rbadge('2013-07-01')") and 'Date unknown' in await pg.evaluate("rbadge('',true)"),'Old shows year; undated shows Date unknown')
+        ok(await pg.evaluate("[relt(0),relt(1),relt(3),relt(45),relt(800),relt(3,true)]")==['today','yesterday','3 days ago','1 month ago','2 years ago','~3 days ago'],'relative time text')
+        today=await pg.evaluate('TODAY');import datetime as dt
+        ok(today==dt.datetime.now(dt.timezone(dt.timedelta(hours=7))).date().isoformat(),'today computed in Bangkok time')
+        def ag(r,t=today):
+            if r['date_precision'].startswith('unknown'):return None
+            return max(0,(dt.date.fromisoformat(t)-dt.date.fromisoformat(r['date'][:10])).days)
+        exp={'7':sum(1 for r in D if ag(r) is not None and ag(r)<=7),'30':sum(1 for r in D if ag(r) is not None and ag(r)<=30),'365':sum(1 for r in D if ag(r) is not None and ag(r)<=365),'old':sum(1 for r in D if ag(r) is None or ag(r)>365)}
+        ok(await pg.text_content('#kW')==str(exp['7']),'New this week KPI')
+        for k,v in exp.items():
+            await pg.click(f'.rc[data-rc="{k}"]');await pg.wait_for_timeout(150)
+            ok(await cnt(pg)==v and await pg.get_attribute(f'.rc[data-rc="{k}"]','aria-pressed')=='true',f'recency chip {k} -> {v}')
+        await pg.click('.rc[data-rc="7"]');await pg.select_option('#fBrand','Malee');await pg.wait_for_timeout(150)
+        ok(await cnt(pg)==sum(1 for r in D if 'Malee' in r['brand'] and ag(r) is not None and ag(r)<=7),'recency + brand combo')
+        await pg.click('.rc[data-rc="old"]');await pg.select_option('#fBrand','');await pg.wait_for_timeout(150)
+        ok(await pg.locator('#feedBox .m.is-old').count()==await pg.locator('#feedBox .m').count()>0,'old items are faded (is-old)')
+        await reset(pg);ok(await cnt(pg)==len(D) and await pg.get_attribute('.rc[data-rc=""]','aria-pressed')=='true','reset clears recency chip')
+        ages=await pg.eval_on_selector_all('#feedBox .m','e=>e.map(x=>+x.dataset.age)')
+        ok(ages==sorted(ages) and len(ages)>1,'feed sorted newest first by default')
+        await pg.select_option('#fSort','old');await pg.wait_for_timeout(150)
+        ages2=await pg.eval_on_selector_all('#feedBox .m','e=>e.map(x=>+x.dataset.age)')
+        ok(ages2==sorted(ages2,reverse=True) and ages2[0]==max(ag(r) for r in D if ag(r) is not None),'sort toggle: oldest first')
+        await pg.select_option('#fSort','new');await pg.wait_for_timeout(150)
+        ok(await pg.locator('#cBody .rb').count()==await pg.locator('#cBody tr').count(),'every complaint row has a recency badge')
+        r1=await pg.text_content('#recs .rec:nth-of-type(1) .rlatest');ok('Old · 2024' in r1,'rec 1 (mould) evidence shows Old: '+r1.strip()[:60])
+        ok(await pg.locator('#recs a[data-d] + .rb').count()==await pg.locator('#recs a[data-d]').count()>0,'every rec evidence link has a badge')
+        ok(await pg.locator('#legend .rb').count()==5,'legend shows all 5 labels')
+        pt=await b.new_page();await pt.goto(URL+'?today=2026-11-26',wait_until='networkidle')
+        ok(await pt.evaluate('TODAY')=='2026-11-26' and await pt.text_content('#kW')==str(sum(1 for r in D if ag(r,'2026-11-26') is not None and ag(r,'2026-11-26')<=7)),'labels recompute for another date (?today=)');await pt.close()
         ok(not errs,'no console errors '+str(errs[:3]))
         # mobile overflow
         m=await b.new_page(viewport={'width':360,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
-        ow=await m.evaluate("document.documentElement.scrollWidth");ok(ow<=360,f'no horizontal overflow at 360px (scrollWidth {ow})')
+        ow=await m.evaluate("document.documentElement.scrollWidth");ok(await m.locator('.rc').count()==5,'recency chips on mobile');ok(ow<=360,f'no horizontal overflow at 360px (scrollWidth {ow})')
         wide=await m.evaluate("[...document.querySelectorAll('main *')].filter(e=>e.getBoundingClientRect().right>362&&!e.closest('.tbl')).length");ok(wide==0,f'no element wider than viewport outside scroll tables ({wide})')
         await b.close()
     print(f'\n{len(fails)} failure(s)');sys.exit(1 if fails else 0)

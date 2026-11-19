@@ -10,3 +10,4 @@ Files: `docs/index.html` (dashboard, Chart.js via CDN), `docs/data.json`, `docs/
 
 ## QA
 `python3 tests/regression.py [URL]` (Playwright + Chrome) checks filters, Thai search, date edges, empty state, CSV BOM and formula guard, saved status, corrupt localStorage, XSS escaping, labels, 360 px overflow, chart totals vs data.json.
+Also covers recency labels (NEW ≤7d · Recent 8–30d · This year 31–365d · Old >1y · Date unknown), recency chips, sort toggle and `?today=YYYY-MM-DD` override for testing.
