@@ -24,7 +24,7 @@ async def main():
         ctx=await b.new_context(viewport={'width':1366,'height':900},accept_downloads=True)
         pg=await ctx.new_page();errs=[]
         pg.on('console',lambda m: errs.append(m.text) if m.type=='error' else None);pg.on('pageerror',lambda e: errs.append(str(e)))
-        await pg.goto(URL,wait_until='networkidle');await pg.wait_for_timeout(800)
+        await pg.goto(URL+'?period=all',wait_until='networkidle');await pg.wait_for_timeout(800)
         ok(await cnt(pg)==len(D),'total count matches data.json')
         mal=sum('Malee' in r['brand'] for r in D)
         await pg.select_option('#fBrand','Malee');await pg.wait_for_timeout(150);ok(await cnt(pg)==mal,'brand filter')
@@ -100,7 +100,7 @@ async def main():
         r1=await pg.text_content('#recs .rec:nth-of-type(1) .rlatest');ok('Old · 2024' in r1,'rec 1 (mould) evidence shows Old: '+r1.strip()[:60])
         ok(await pg.locator('#recs a[data-d] + .rb').count()==await pg.locator('#recs a[data-d]').count()>0,'every rec evidence link has a badge')
         ok(await pg.locator('#legend .rb').count()==5,'legend shows all 5 labels')
-        pt=await b.new_page();await pt.goto(URL+'?today=2026-11-26',wait_until='networkidle')
+        pt=await b.new_page();await pt.goto(URL+'?today=2026-11-26&period=all',wait_until='networkidle')
         ok(await pt.evaluate('TODAY')=='2026-11-26' and await pt.text_content('#kW')==str(sum(1 for r in D if ag(r,'2026-11-26') is not None and ag(r,'2026-11-26')<=7)),'labels recompute for another date (?today=)');await pt.close()
         # ---- Malee health gauge ----
         RW={'new':1,'recent':.75,'year':.4,'old':.1,'unk':.1}
@@ -136,7 +136,7 @@ async def main():
         await pg.click('#hDrvA');await pg.wait_for_timeout(300);tag=await pg.get_attribute('#hDrvA','data-tag')
         ok(await cnt(pg)==sum(1 for r in D if 'Malee' in r['brand'] and r['sentiment']=='neg' and tag in r['tags']) and await pg.input_value('#fTopic')==tag,f'main driver link filters feed to {tag}')
         await reset(pg)
-        pt=await b.new_page();await pt.goto(URL+'?today=2028-01-01',wait_until='networkidle')
+        pt=await b.new_page();await pt.goto(URL+'?today=2028-01-01&period=all',wait_until='networkidle')
         ok(await pt.text_content('#gScore')==str(hs('Malee','2028-01-01')[1]),'gauge respects ?today= override');await pt.close()
         # ---- Why this score (drivers) ----
         def drv(t=today,mx=None):
@@ -165,7 +165,7 @@ async def main():
         dl=pg.locator('#why .wcol.dn .dlink').first;tg=await dl.get_attribute('data-tag');await dl.click();await pg.wait_for_timeout(300)
         ok(await cnt(pg)==sum(1 for r in D if 'Malee' in r['brand'] and r['sentiment']=='neg' and tg in r['tags']),f'driver link filters feed ({tg}, negative)')
         await reset(pg)
-        pt=await b.new_page();await pt.goto(URL+'?today=2028-01-01',wait_until='networkidle');T2=drv('2028-01-01')
+        pt=await b.new_page();await pt.goto(URL+'?today=2028-01-01&period=all',wait_until='networkidle');T2=drv('2028-01-01')
         ok(abs(50+sum(T2.values())-int(await pt.text_content('#gScore')))<=0.5 and (await pt.locator('#why h3').text_content())==('Why '+await pt.text_content('#gScore')+'?'),'drivers respect ?today=');await pt.close()
         # ---- brand switcher: every brand vs independent calc ----
         def hsb(brand,t=today,mx=None):
@@ -197,11 +197,11 @@ async def main():
                 dl=pg.locator('#why .wcol.dn .dlink').first;tg=await dl.get_attribute('data-tag');await dl.click();await pg.wait_for_timeout(300)
                 ok(await pg.input_value('#fBrand')=='Tipco' and await cnt(pg)==sum(1 for r in D if 'Tipco' in r['brand'] and r['sentiment']=='neg' and tg in r['tags']),'feed link filters to the selected brand')
                 await reset(pg)
-        ok('brand=Chaokoh' in pg.url,'brand choice in URL')
+        ok('brand=Chaokoh' in pg.url and 'period=all' in pg.url,'brand choice in URL')
         await pg.click('#hComp tr[data-brand="Doi Kham"]');await pg.wait_for_timeout(150);ok(await pg.input_value('#hBrand')=='Doi Kham','clicking strip selects brand')
         await pg.goto(URL,wait_until='networkidle');await pg.wait_for_timeout(300);ok(await pg.input_value('#hBrand')=='Doi Kham','brand persists in localStorage')
         await pg.select_option('#hBrand','Malee');await pg.wait_for_timeout(100)
-        pq=await b.new_page();await pq.goto(URL+'?brand=Cocomax',wait_until='networkidle');ok(await pq.input_value('#hBrand')=='Cocomax' and await pq.text_content('#gScore')==str(hsb('Cocomax')[1]),'?brand= works');
+        pq=await b.new_page();await pq.goto(URL+'?brand=Cocomax&period=all',wait_until='networkidle');ok(await pq.input_value('#hBrand')=='Cocomax' and await pq.text_content('#gScore')==str(hsb('Cocomax')[1]),'?brand= works');
         await pq.goto(URL+'?brand=Nope',wait_until='networkidle');ok(await pq.input_value('#hBrand') in ['Cocomax','Malee'],'invalid ?brand= ignored');await pq.close()
         # ---- language ----
         WL=set("""Malee Coco Tipco Doi Kham Cocomax Chaokoh Pantip Google Facebook Instagram Lemon8 TikTok YouTube LINE Teams API CSV KPI PETA Thai PBS TCC ISRA News CIRA QR SOP CRM DM QA PR IT R&D CSR FDA UHT NFC PDPA UTC Grok Bot GitHub Actions Meta Graph Research Business Profile Shopee Lazada OA Wisesight Zocial Eye Mandala Brandwatch Talkwalker Meltwater CrowdTangle Thansettakij Post Today The Thaiger TrueID Shorts data json mentions csv MOCK Plus Eleven Matcha UK EN Lemon Maps""".split())
@@ -209,7 +209,7 @@ async def main():
             return await pp.evaluate("""wl=>{const out=[];const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode()){const e=n.parentElement;if(!e||e.closest('.c,script,style,svg title,option:not(:checked)'))continue;if(!e.getClientRects().length)continue;const cs=getComputedStyle(e);if(cs.visibility==='hidden')continue;(n.textContent.match(/[A-Za-z][A-Za-z&]{2,}/g)||[]).forEach(t=>{if(!wl.includes(t))out.push(t)})}
             document.querySelectorAll('[placeholder],[aria-label],select').forEach(e=>{let v=e.tagName==='SELECT'?(e.selectedOptions[0]||{}).text||'':(e.getAttribute('placeholder')||'')+' '+(e.getAttribute('aria-label')||'');v=v.replace(/\\bM[0-9a-f]{6}\\b/g,'');(v.match(/[A-Za-z][A-Za-z&]{2,}/g)||[]).forEach(t=>{if(!wl.includes(t))out.push('@'+t)})});return [...new Set(out)]}""",list(WL))
         pl=await b.new_page(viewport={'width':1366,'height':900});el=[];pl.on('pageerror',lambda e:el.append(str(e)));pl.on('console',lambda m: el.append(m.text) if m.type=='error' else None)
-        await pl.goto(URL+'?lang=th',wait_until='networkidle');await pl.wait_for_timeout(600)
+        await pl.goto(URL+'?lang=th&period=all',wait_until='networkidle');await pl.wait_for_timeout(600)
         ok(await pl.evaluate('document.documentElement.lang')=='th' and 'แดชบอร์ด' in await pl.text_content('h1'),'?lang=th switches the page')
         lo=await leftovers(pl);ok(not lo,f'no untranslated UI strings in TH mode {lo[:20]}')
         ok((await pl.text_content('#gStatus')) in ['ดี','เฝ้าระวัง','เสี่ยง'] and 'ทำไม' in await pl.text_content('#why h3') and 'คะแนน 30 วัน' in await pl.text_content('#why30'),'TH gauge, why panel and 30-day note')
@@ -226,8 +226,64 @@ async def main():
             mm=await b.new_page(viewport={'width':375,'height':800},is_mobile=True);await mm.goto(URL+f'?lang={lg}',wait_until='networkidle');await mm.wait_for_timeout(500)
             w_=await mm.evaluate("document.documentElement.scrollWidth");wd=await mm.evaluate("[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>377&&!e.closest('.tbl,.rrow')).map(e=>e.tagName+'.'+e.className).slice(0,5)")
             ok(w_<=375 and not wd,f'no overflow at 375px in {lg} ({w_}) {wd}');await mm.close()
-        pt2=await b.new_page();await pt2.goto(URL+'?today=2028-01-01&lang=th&brand=Tipco',wait_until='networkidle')
+        pt2=await b.new_page();await pt2.goto(URL+'?today=2028-01-01&lang=th&brand=Tipco&period=all',wait_until='networkidle')
         ok(await pt2.text_content('#gScore')==str(hsb('Tipco','2028-01-01')[1]) and await pt2.evaluate('TODAY')=='2028-01-01','?today= works with ?lang and ?brand');await pt2.close()
+        # ---- period: last 12 months (default) vs all time ----
+        def inp(r,per,t=today): return per=='all' or (ag(r,t) is not None and ag(r,t)<=365)
+        def hsp(brand,per,t=today,mx=None):
+            rows=[r for r in D if inp(r,per,t) and brand in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))];num=den=0;T={}
+            items=[]
+            for r in rows:
+                w=RW[bk(ag(r,t))];sev=r['sentiment']=='neg' and r['complaint'] and r.get('severity')=='High'
+                v={'pos':1,'neu':0}.get(r['sentiment'],-2 if sev else -1);num+=w*v;den+=w*(2 if sev else 1);items.append((r,w,v))
+            for r,w,v in items:
+                if not v: continue
+                tags=r['tags'] or ['(untagged)']
+                for g in tags:T[('up' if v>0 else 'dn',g)]=T.get(('up' if v>0 else 'dn',g),0)+50*w*v/den/len(tags)
+            sc_=int(50+50*num/den+.5) if den and len(rows)>=3 else None
+            return len(rows),sc_,T
+        p2=await b.new_page(viewport={'width':1366,'height':900});e2=[];p2.on('pageerror',lambda e:e2.append(str(e)));p2.on('console',lambda m: e2.append(m.text) if m.type=='error' else None)
+        await p2.goto(URL,wait_until='networkidle');await p2.wait_for_timeout(500)
+        ok(await p2.evaluate('PERIOD')=='12m' and await p2.get_attribute('#ptog button[data-p="12m"]','aria-pressed')=='true','12m is the default')
+        n12=sum(1 for r in D if inp(r,'12m'));ok(await cnt(p2)==n12 and await p2.text_content('#kM')==str(n12),f'feed/KPI use 12m ({n12} of {len(D)})')
+        ok(not any(await p2.eval_on_selector_all('#feedBox .m','e=>e.map(x=>x.dataset.age===""||+x.dataset.age>365)')),'no old or undated items in 12m feed')
+        ok(await p2.evaluate("charts.cPlat.data.datasets[0].data.reduce((a,b)=>a+b,0)")==n12,'charts use 12m')
+        for per in ['12m','all']:
+            await p2.click(f'#ptog button[data-p="{per}"]');await p2.wait_for_timeout(200)
+            for br in ['Malee','Tipco','Doi Kham','if','Cocomax','Chaokoh']:
+                await p2.select_option('#hBrand',br);await p2.wait_for_timeout(120)
+                n_,s_,T_=hsp(br,per);up_=sorted([(g,p) for (sd,g),p in T_.items() if sd=='up'],key=lambda x:-x[1])[:3];dn_=sorted([(g,p) for (sd,g),p in T_.items() if sd=='dn'],key=lambda x:x[1])[:3]
+                gu=await p2.eval_on_selector_all('#why .wcol.up .drow','e=>e.map(x=>[x.dataset.tag,+x.dataset.pts])');gd=await p2.eval_on_selector_all('#why .wcol.dn .drow','e=>e.map(x=>[x.dataset.tag,+x.dataset.pts])')
+                strip=await p2.get_attribute(f'#hComp tr[data-brand="{br}"]','data-score')
+                sevb=sum(1 for r in D if inp(r,per) and br in r['brand'] and r['complaint'] and r.get('severity')=='High')
+                good=(await p2.text_content('#gScore')==(str(s_) if s_ is not None else '–') and strip==(str(s_) if s_ is not None else '') and await p2.text_content('#hSev')==str(sevb)
+                      and [g for g,_ in gu]==[g for g,_ in up_] and [g for g,_ in gd]==[g for g,_ in dn_] and all(abs(a[1]-c[1])<1e-3 for a,c in zip(gu+gd,up_+dn_))
+                      and (s_ is None or abs(50+sum(T_.values())-s_)<=0.5) and (await p2.is_visible('#hLow'))==(n_<10))
+                olds=[r for r in D if br in r['brand'] and r['complaint'] and r.get('severity')=='High' and not inp(r,'12m')]
+                note=await p2.is_visible('#hOld');good=good and note==(per=='12m' and bool(olds))
+                ok(good,f'{per} {br}: score {s_} n={n_} up {[g for g,_ in up_][:1]} down {[g for g,_ in dn_][:1]} old-severe-note {note}')
+        await p2.click('#ptog button[data-p="12m"]');await p2.select_option('#hBrand','Malee');await p2.wait_for_timeout(150)
+        ot=await p2.text_content('#hOld');ok('past severe' in ot and '2013' in ot,'old severe note text: '+ot)
+        await p2.click('#hOld');await p2.wait_for_timeout(200);ok(await p2.evaluate('PERIOD')=='all' and 'period=all' in p2.url and await cnt(p2)==len(D),'old-issue note switches to All time')
+        await p2.reload(wait_until='networkidle');await p2.wait_for_timeout(300);ok(await p2.evaluate('PERIOD')=='all','period persists (URL)')
+        await p2.goto(URL,wait_until='networkidle');await p2.wait_for_timeout(300);ok(await p2.evaluate('PERIOD')=='all','period persists (localStorage)')
+        await p2.click('#ptog button[data-p="12m"]');await p2.wait_for_timeout(200);ok('period=' not in p2.url,'12m removes ?period from URL')
+        ok(await p2.locator('#recs .rec.hist').count()==1 and await p2.locator('#recs .rec:nth-of-type(1).hist .histn').count()==1,'food-safety rec kept visible, marked Historical in 12m')
+        await p2.click('.rc[data-rc="old"]');await p2.wait_for_timeout(250)
+        ok(await p2.evaluate('PERIOD')=='all' and await cnt(p2)==sum(1 for r in D if ag(r) is None or ag(r)>365),'Older chip in 12m switches to All time')
+        await p2.click('#ptog button[data-p="12m"]');await p2.wait_for_timeout(200);ok(await p2.get_attribute('.rc[data-rc=""]','aria-pressed')=='true' and await cnt(p2)==n12,'switching back to 12m clears Older chip')
+        async with p2.expect_download() as dl2: await p2.click('#csv')
+        dv=await dl2.value;ok('last-12-months' in dv.suggested_filename and sum(1 for x in open(await dv.path(),encoding='utf-8-sig').read().split('\n') if x.startswith('"M'))==n12,'CSV export is period-labelled and 12m only')
+        await p2.goto(URL+'?lang=th',wait_until='networkidle');await p2.wait_for_timeout(400);lo5=await leftovers(p2)
+        ok(not lo5 and 'ประเด็นร้ายแรงในอดีต' in await p2.text_content('#hOld') and 'ข้อมูลในอดีต' in await p2.text_content('#recs'),f'TH 12m translated {lo5[:10]}')
+        await p2.goto(URL+'?lang=en',wait_until='networkidle');ok(not e2,'no console errors in period tests '+str(e2[:3]));await p2.close()
+        for lg in ['en','th']:
+            for per in ['12m','all']:
+                mm=await b.new_page(viewport={'width':375,'height':800},is_mobile=True);await mm.goto(URL+f'?lang={lg}&period={per}',wait_until='networkidle');await mm.wait_for_timeout(400)
+                w_=await mm.evaluate("document.documentElement.scrollWidth");wd=await mm.evaluate("[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>377&&!e.closest('.tbl,.rrow')).length")
+                ok(w_<=375 and not wd,f'no overflow at 375px {lg}/{per}');await mm.close()
+        p3=await b.new_page();await p3.goto(URL+'?today=2028-01-01&brand=Tipco',wait_until='networkidle');n3,s3,_=hsp('Tipco','12m','2028-01-01')
+        ok(await p3.text_content('#gScore')==(str(s3) if s3 is not None else '–') and await cnt(p3)==sum(1 for r in D if inp(r,'12m','2028-01-01')),f'?today= works in 12m (Tipco n={n3}, score {s3})');await p3.close()
         ok(not errs,'no console errors '+str(errs[:3]))
         # mobile overflow
         m=await b.new_page(viewport={'width':375,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
