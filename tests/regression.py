@@ -17,6 +17,15 @@ async def main():
     ok(len({r['id'] for r in D})==len(D),'unique stable ids')
     ok(len({r['url'] for r in D})==len(D),'no duplicate source urls')
     ok(all(r['url'].startswith('https://') for r in D),'all urls https')
+    ok(all(r.get('link_status') in ('ok','login','removed') for r in D),'every mention has a link status')
+    ok({r['id'] for r in D if r.get('link_status')=='removed'}=={'M859204','M9f6556'},'deleted X posts M859204 and M9f6556 are removed')
+    ok({r['id'] for r in D if r.get('link_status')=='login'}=={'Mb240cf','M3e63d9','M9c8cdf'},'only the three Facebook photo links need login')
+    ok(all(r.get('link_status')=='ok' for r in D if r['id'] in ('Mda95ad','M3c0e41','M8ff17c')),'other Facebook posts are publicly readable')
+    import csv as _csv
+    with open(os.path.join(here,'..','docs','mentions.csv'),encoding='utf-8-sig',newline='') as _f: _csvrows=list(_csv.DictReader(_f))
+    _by={r['id']:r for r in D}
+    ok(len(_csvrows)==len(D) and all(_by[c['id']]['link_status']==c.get('link_status') and _by[c['id']]['url']==c['url'] and _by[c['id']]['sentiment']==c['sentiment'] for c in _csvrows),'mentions.csv matches data.json on url, sentiment and link status')
+    def scored(r): return r.get('link_status')!='removed'
     ok(not any('&amp;' in r['text'] for r in D),'no double-escaped entities in text')
     ok(not any(r['date_precision'].startswith('unknown') for r in D),'no undated items')
     async with async_playwright() as p:
@@ -106,7 +115,7 @@ async def main():
         RW={'new':1,'recent':.75,'year':.4,'old':.1,'unk':.1}
         def bk(a): return 'unk' if a is None else 'new' if a<=7 else 'recent' if a<=30 else 'year' if a<=365 else 'old'
         def hs(brand,t=today,mx=None):
-            num=den=0;rows=[r for r in D if brand in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))]
+            num=den=0;rows=[r for r in D if scored(r) and brand in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))]
             for r in rows:
                 w=RW[bk(ag(r,t))];sev=r['sentiment']=='neg' and r['complaint'] and r.get('severity')=='High'
                 v={'pos':1,'neu':0}.get(r['sentiment'],-2 if sev else -1);num+=w*v;den+=w*(2 if sev else 1)
@@ -140,7 +149,7 @@ async def main():
         ok(await pt.text_content('#gScore')==str(hs('Malee','2028-01-01')[1]),'gauge respects ?today= override');await pt.close()
         # ---- Why this score (drivers) ----
         def drv(t=today,mx=None):
-            rows=[r for r in D if 'Malee' in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))];den=0;items=[]
+            rows=[r for r in D if scored(r) and 'Malee' in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))];den=0;items=[]
             for r in rows:
                 w=RW[bk(ag(r,t))];sev=r['sentiment']=='neg' and r['complaint'] and r.get('severity')=='High'
                 v={'pos':1,'neu':0}.get(r['sentiment'],-2 if sev else -1);den+=w*(2 if sev else 1);items.append((r,w,v))
@@ -169,7 +178,7 @@ async def main():
         ok(abs(50+sum(T2.values())-int(await pt.text_content('#gScore')))<=0.5 and (await pt.locator('#why h3').text_content())==('Why '+await pt.text_content('#gScore')+'?'),'drivers respect ?today=');await pt.close()
         # ---- brand switcher: every brand vs independent calc ----
         def hsb(brand,t=today,mx=None):
-            rows=[r for r in D if brand in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))];num=den=0;T={}
+            rows=[r for r in D if scored(r) and brand in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))];num=den=0;T={}
             for r in rows:
                 w=RW[bk(ag(r,t))];sev=r['sentiment']=='neg' and r['complaint'] and r.get('severity')=='High'
                 v={'pos':1,'neu':0}.get(r['sentiment'],-2 if sev else -1);num+=w*v;den+=w*(2 if sev else 1)
@@ -231,7 +240,7 @@ async def main():
         # ---- period: last 12 months (default) vs all time ----
         def inp(r,per,t=today): return per=='all' or (ag(r,t) is not None and ag(r,t)<=365)
         def hsp(brand,per,t=today,mx=None):
-            rows=[r for r in D if inp(r,per,t) and brand in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))];num=den=0;T={}
+            rows=[r for r in D if scored(r) and inp(r,per,t) and brand in r['brand'] and (mx is None or (ag(r,t) is not None and ag(r,t)<=mx))];num=den=0;T={}
             items=[]
             for r in rows:
                 w=RW[bk(ag(r,t))];sev=r['sentiment']=='neg' and r['complaint'] and r.get('severity')=='High'
@@ -285,6 +294,28 @@ async def main():
         p3=await b.new_page();await p3.goto(URL+'?today=2028-01-01&brand=Tipco',wait_until='networkidle');n3,s3,_=hsp('Tipco','12m','2028-01-01')
         ok(await p3.text_content('#gScore')==(str(s3) if s3 is not None else '–') and await cnt(p3)==sum(1 for r in D if inp(r,'12m','2028-01-01')),f'?today= works in 12m (Tipco n={n3}, score {s3})');await p3.close()
         ok(not errs,'no console errors '+str(errs[:3]))
+        # link status is visible on every source, in both languages
+        lp=await b.new_page(viewport={'width':1280,'height':800})
+        await lp.goto(URL+'?lang=en&period=all',wait_until='networkidle');await lp.wait_for_timeout(400)
+        await lp.evaluate('shown=300;render()')
+        bad=await lp.evaluate('''()=>{const bad=[];const key=u=>{const m=String(u||'').match(/\\/status\\/(\\d+)/);if(m)return 'x:'+m[1];try{const x=new URL(u);return x.hostname.replace(/^www\\./,'')+x.pathname.replace(/\\/$/,'')+x.search}catch(e){return String(u)}};const by={};DATA.forEach(r=>by[key(r.url)]=r);document.querySelectorAll("a[href^='https']").forEach(a=>{const r=by[key(a.href)];if(!r)return;if(a.dataset.ls!==r.link_status)bad.push((r.id)+' '+a.dataset.ls+' != '+r.link_status);const n=a.nextElementSibling;const note=n&&(n.classList.contains('lbad')||n.classList.contains('lnote'))?n:null;if(r.link_status==='removed'&&!(note&&note.classList.contains('lbad')))bad.push(r.id+' missing removed');if(r.link_status==='login'&&!(note&&note.classList.contains('lnote')))bad.push(r.id+' missing login');if(r.link_status==='ok'&&note)bad.push(r.id+' unexpected note')});return bad}''')
+        ok(bad==[],'every source link carries its status '+str(bad[:8]))
+        await lp.select_option('#fPlat','Facebook');await lp.wait_for_timeout(200)
+        ok(await lp.locator('#feedBox .lnote').count()==3 and await lp.locator('#feedBox .lbad').count()==0,'three Facebook photo links say login needed, with no warning')
+        for mid in ('Mda95ad','M3c0e41'):
+            card=lp.locator('#feedBox .m',has_text=mid)
+            ok(await card.count()==1 and await card.locator('.lnote,.lbad').count()==0,mid+' is readable, so it has no login note')
+        await lp.select_option('#fPlat','');await lp.fill('#fQ','Shopee');await lp.wait_for_timeout(400)
+        ok((await lp.locator('#feedBox .m',has_text='M859204').locator('.lbad').inner_text()).strip()=='source removed','M859204 shows source removed')
+        ok((await lp.locator('#feedBox .m',has_text='M9f6556').locator('.lbad').inner_text()).strip()=='source removed','M9f6556 shows source removed')
+        ok(await lp.evaluate('''()=>{const r=DATA.find(x=>x.id==="M859204");r.complaint=true;r.severity="Low";shown=300;render();const row=[...document.querySelectorAll("#cBody tr")].find(tr=>tr.textContent.includes("M859204"));return !!row&&row.querySelector("a").dataset.ls==="removed"&&!!row.querySelector(".lbad")}'''),'complaints table flags a removed source')
+        await lp.goto(URL+'?lang=th&period=all',wait_until='networkidle');await lp.wait_for_timeout(300)
+        await lp.fill('#fQ','Shopee');await lp.wait_for_timeout(400)
+        ok((await lp.locator('#feedBox .m',has_text='M9f6556').locator('.lbad').inner_text()).strip()=='แหล่งที่มาถูกลบ','Thai removed badge')
+        await lp.fill('#fQ','');await lp.select_option('#fPlat','Facebook');await lp.wait_for_timeout(200)
+        ok((await lp.locator('#feedBox .lnote').first.inner_text()).strip()=='ต้องล็อกอิน','Thai login note')
+        ok('ไม่นำมาคิดคะแนนสุขภาพ' in await lp.text_content('#method'),'method note explains removed posts and the score')
+        await lp.close()
         # mobile overflow
         m=await b.new_page(viewport={'width':375,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
         ow=await m.evaluate("document.documentElement.scrollWidth");ok(await m.locator('.rc').count()==5,'recency chips on mobile');ok(ow<=375 and await m.locator('#health svg').is_visible(),f'gauge visible, no horizontal overflow at 375px (scrollWidth {ow})')
@@ -314,6 +345,12 @@ async def main():
           return {td:getComputedStyle(td).display, th:getComputedStyle(th).display, issue:document.querySelector('#cBody td:nth-child(5)').getBoundingClientRect().width, clab:getComputedStyle(document.querySelector('#cBody .clab')).display}}""")
         ok(desk['td']=='table-cell' and desk['th']=='table-header-group' and desk['clab']=='none' and desk['issue']>300, f'desktop complaints table unchanged {desk}')
         await dk.close()
+        ph=await b.new_page(viewport={'width':390,'height':844},is_mobile=True)
+        await ph.goto(URL+'?lang=en&period=all',wait_until='networkidle');await ph.wait_for_timeout(300)
+        ok(await ph.evaluate('''()=>{const r=DATA.find(x=>x.id==="M859204");r.complaint=true;r.severity="Low";shown=300;render();const row=[...document.querySelectorAll("#cBody tr")].find(tr=>tr.textContent.includes("M859204"));const bad=row.querySelector(".lbad");const src=row.children[8];return getComputedStyle(row).display==="grid"&&src.contains(bad)&&bad.textContent.includes("source removed")&&document.documentElement.scrollWidth<=390}'''),'phone complaint card shows the removed badge in the source cell')
+        await ph.goto(URL+'?lang=th&period=all',wait_until='networkidle');await ph.wait_for_timeout(300)
+        ok(await ph.evaluate('''()=>{const r=DATA.find(x=>x.id==="M859204");r.complaint=true;r.severity="Low";shown=300;render();const row=[...document.querySelectorAll("#cBody tr")].find(tr=>tr.textContent.includes("M859204"));const bad=row.querySelector(".lbad");return row.children[8].contains(bad)&&bad.textContent.includes("แหล่งที่มาถูกลบ")&&document.documentElement.scrollWidth<=390}'''),'phone complaint card shows the Thai removed badge')
+        await ph.close()
         await b.close()
     print(f'\n{len(fails)} failure(s)');sys.exit(1 if fails else 0)
 asyncio.run(main())
