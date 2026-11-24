@@ -24,7 +24,10 @@ async def main():
     import csv as _csv
     with open(os.path.join(here,'..','docs','mentions.csv'),encoding='utf-8-sig',newline='') as _f: _csvrows=list(_csv.DictReader(_f))
     _by={r['id']:r for r in D}
-    ok(len(_csvrows)==len(D) and all(_by[c['id']]['link_status']==c.get('link_status') and _by[c['id']]['url']==c['url'] and _by[c['id']]['sentiment']==c['sentiment'] for c in _csvrows),'mentions.csv matches data.json on url, sentiment and link status')
+    ok(all(r.get('post_type') in ('Public','Brand','Paid','News') for r in D),'every mention has one post type')
+    ok(_by['Meeae4b']['post_type']=='Brand' and _by['M96942d']['post_type']=='Brand' and _by['Md9bb40']['post_type']=='Brand','press releases and the Tipco account are Brand')
+    ok(_by['M859204']['post_type']=='Paid' and _by['M9f6556']['post_type']=='Paid' and _by['M30f81b']['post_type']=='News','affiliate posts are Paid and Thai PBS is News')
+    ok(len(_csvrows)==len(D) and all(_by[c['id']]['link_status']==c.get('link_status') and _by[c['id']]['post_type']==c.get('post_type') and _by[c['id']]['url']==c['url'] and _by[c['id']]['sentiment']==c['sentiment'] for c in _csvrows),'mentions.csv matches data.json on url, sentiment, link status and post type')
     def scored(r): return r.get('link_status')!='removed'
     ok(not any('&amp;' in r['text'] for r in D),'no double-escaped entities in text')
     ok(not any(r['date_precision'].startswith('unknown') for r in D),'no undated items')
@@ -60,10 +63,18 @@ async def main():
         ok(raw.startswith(b'\xef\xbb\xbf'),'CSV has UTF-8 BOM');txt=raw.decode('utf-8-sig')
         ok(not re.search(r'(^|,)"[=+\-@]',txt,re.M),'CSV cells guarded against formula injection')
         ok('น้ำ' in txt,'CSV keeps Thai text')
-        # status persistence
-        sel=pg.locator('#cBody select[data-k=status]').first;sid=await sel.get_attribute('data-id');await sel.select_option('Responded')
-        await pg.reload(wait_until='networkidle');await pg.wait_for_timeout(400)
-        ok(await pg.eval_on_selector(f'select[data-id="{sid}"][data-k=status]','e=>e.value')=='Responded','status persists after reload')
+        # owner is fixed from the topic; status is read-only New
+        sid='Mc25f88'
+        ok(await pg.locator('#cBody select[data-k=status]').count()==0 and await pg.locator('#cBody select[data-k=owner]').count()==0,'owner and status are not dropdowns')
+        st_txt=await pg.locator('#cBody .stfix').all_inner_texts()
+        ok(st_txt and set(t.strip() for t in st_txt)=={'New'},'every complaint status is New')
+        ok(await pg.evaluate('''()=>{const row=[...document.querySelectorAll('#cBody tr')].find(tr=>tr.textContent.includes('Mc25f88'));return ownerOf(DATA.find(r=>r.id==='Mc25f88'))==='Sales'&&row.querySelector('.ow').textContent==='Sales'}'''),'a price complaint is owned by Sales')
+        ok(await pg.evaluate("ownerOf(DATA.find(r=>r.id==='Maf26d9'))")=='Packaging / R&D','packaging beats availability for the owner')
+        ok(await pg.evaluate("ownerOf(DATA.find(r=>r.id==='Ma73837'))")=='QA / Food Safety','contamination is owned by QA')
+        n_qa=sum(1 for r in D if r['complaint'] and ( (lambda tags: next((o for t,o in [('quality/contamination','QA / Food Safety'),('ethics','Sustainability / CSR'),('taste','R&D / Brand'),('quality','R&D / Brand'),('packaging','Packaging / R&D'),('service','Customer Care'),('price','Sales'),('availability','Trade'),('health/sugar','R&D / Brand'),('promo','Brand / Marketing')] if t in tags),'Customer Care'))(r.get('tags') or []) )=='QA / Food Safety')
+        await pg.select_option('#fOwner','QA / Food Safety');await pg.wait_for_timeout(150)
+        ok(await pg.locator('#cBody tr').count()==n_qa,'owner filter keeps only that owner')
+        await pg.select_option('#fOwner','');await pg.wait_for_timeout(100)
         # corrupt storage
         for bad in ['null','[]','not json{','{"x":5}','{"%s":{"status":"<img>"}}'%sid]:
             await pg.evaluate("v=>localStorage.setItem('malee-sl-v1',v)",bad);e0=len(errs)
@@ -135,11 +146,11 @@ async def main():
         ok(str(s30) in tr and (('▲' in tr) if s30-sc>3 else ('▼' in tr) if s30-sc<-3 else ('►' in tr)),f'30-day trend {s30} vs {sc}: {tr}')
         sevn=sum(1 for r in D if 'Malee' in r['brand'] and r['complaint'] and r.get('severity')=='High')
         ok(await pg.text_content('#hSev')==str(sevn),f'severe open issues {sevn}')
-        sel=pg.locator('#cBody tr:has-text("Malee") select[data-k=status]');k=0
-        for i in range(await sel.count()):
-            rid=await sel.nth(i).get_attribute('data-id');rr=[r for r in D if r['id']==rid][0]
-            if rr.get('severity')=='High':await sel.nth(i).select_option('Closed');k=1;break
-        if k: ok(await pg.text_content('#hSev')==str(sevn-1),'closing a severe issue lowers the count')
+        hid=next(r['id'] for r in D if 'Malee' in r['brand'] and r['complaint'] and r.get('severity')=='High')
+        await pg.evaluate("(id)=>{window.MALEE_STATUS={[id]:'Closed'};renderHealth()}",hid)
+        ok(await pg.text_content('#hSev')==str(sevn-1),'a pilot sheet status of Closed lowers the severe count')
+        await pg.evaluate("()=>{delete window.MALEE_STATUS;renderHealth()}")
+        ok(await pg.text_content('#hSev')==str(sevn),'clearing the sheet status restores the count')
         await pg.evaluate("localStorage.removeItem('malee-sl-v1')")
         ok(await pg.locator('#health details.how summary').count()==1,'formula expander present')
         await pg.click('#hDrvA');await pg.wait_for_timeout(300);tag=await pg.get_attribute('#hDrvA','data-tag')
@@ -213,7 +224,7 @@ async def main():
         pq=await b.new_page();await pq.goto(URL+'?brand=Cocomax&period=all',wait_until='networkidle');ok(await pq.input_value('#hBrand')=='Cocomax' and await pq.text_content('#gScore')==str(hsb('Cocomax')[1]),'?brand= works');
         await pq.goto(URL+'?brand=Nope',wait_until='networkidle');ok(await pq.input_value('#hBrand') in ['Cocomax','Malee'],'invalid ?brand= ignored');await pq.close()
         # ---- language ----
-        WL=set("""Malee Coco Tipco Doi Kham Cocomax Chaokoh Pantip Google Facebook Instagram Lemon8 TikTok YouTube LINE Teams API CSV KPI PETA Thai PBS TCC ISRA News CIRA QR SOP CRM DM QA PR IT R&D CSR FDA UHT NFC PDPA UTC Grok Bot GitHub Actions Meta Graph Research Business Profile Shopee Lazada OA Wisesight Zocial Eye Mandala Brandwatch Talkwalker Meltwater CrowdTangle Thansettakij Post Today The Thaiger TrueID Shorts data json mentions csv MOCK Plus Eleven Matcha UK EN Lemon Maps""".split())
+        WL=set("""Malee Coco Tipco Doi Kham Cocomax Chaokoh Pantip Google Facebook Instagram Lemon8 TikTok YouTube LINE Teams API CSV KPI PETA Thai PBS TCC ISRA News CIRA QR SOP CRM DM QA PR IT R&D CSR FDA UHT NFC PDPA UTC Grok Bot GitHub Actions Meta Graph Research Business Profile Shopee Lazada OA Wisesight Zocial Eye Mandala Brandwatch Talkwalker Meltwater CrowdTangle Thansettakij Post Today The Thaiger TrueID Shorts data json mentions csv MOCK PDF Plus Eleven Matcha UK EN Lemon Maps""".split())
         async def leftovers(pp):
             return await pp.evaluate("""wl=>{const out=[];const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode()){const e=n.parentElement;if(!e||e.closest('.c,script,style,svg title,option:not(:checked)'))continue;if(!e.getClientRects().length)continue;const cs=getComputedStyle(e);if(cs.visibility==='hidden')continue;(n.textContent.match(/[A-Za-z][A-Za-z&]{2,}/g)||[]).forEach(t=>{if(!wl.includes(t))out.push(t)})}
             document.querySelectorAll('[placeholder],[aria-label],select').forEach(e=>{let v=e.tagName==='SELECT'?(e.selectedOptions[0]||{}).text||'':(e.getAttribute('placeholder')||'')+' '+(e.getAttribute('aria-label')||'');v=v.replace(/\\bM[0-9a-f]{6}\\b/g,'');(v.match(/[A-Za-z][A-Za-z&]{2,}/g)||[]).forEach(t=>{if(!wl.includes(t))out.push('@'+t)})});return [...new Set(out)]}""",list(WL))
@@ -316,6 +327,21 @@ async def main():
         ok((await lp.locator('#feedBox .lnote').first.inner_text()).strip()=='ต้องล็อกอิน','Thai login note')
         ok('ไม่นำมาคิดคะแนนสุขภาพ' in await lp.text_content('#method'),'method note explains removed posts and the score')
         await lp.close()
+        tp=await b.new_page(viewport={'width':1280,'height':800})
+        await tp.goto(URL+'?lang=en&period=all',wait_until='networkidle');await tp.wait_for_timeout(300)
+        ok(await tp.locator('#ptype input:checked').count()==4 and await tp.locator('#feedBox .ptag').count()>0,'post-type ticks start on and posts show a type badge')
+        n_all=await cnt(tp)
+        await tp.click('#ptype input[data-pt="Brand"]');await tp.click('#ptype input[data-pt="Paid"]');await tp.wait_for_timeout(200)
+        organic=sum(1 for r in D if r.get('post_type') in ('Public','News'))
+        ok(await cnt(tp)==organic and n_all==len(D),'unticking Brand and Paid leaves organic mentions')
+        ok(await tp.evaluate("health('Malee').n")==sum(1 for r in D if scored(r) and 'Malee' in r['brand'] and r.get('post_type') in ('Public','News')),'health score follows the post-type ticks')
+        await tp.click('#ptype input[data-pt="Brand"]');await tp.click('#ptype input[data-pt="Paid"]');await tp.wait_for_timeout(150)
+        ok(await cnt(tp)==len(D),'ticking every post type restores the full set')
+        await tp.goto(URL+'?lang=th&period=all',wait_until='networkidle');await tp.wait_for_timeout(200)
+        ok((await tp.locator('#feedBox .ptag').first.inner_text()).strip() in ('สาธารณะ','แบรนด์','โฆษณา','ข่าว'),'post-type badge is translated')
+        ok(await tp.evaluate("CONFIG.brands.map(b=>b.id+' '+b.color).join('|')")=='Malee #0b8a47|Tipco #f08a1c|Doi Kham #c0392b|if #2b8fd6|Cocomax #7b5cd6|Chaokoh #8d6e3f|Category #8a96a3','brand names and colours come from CONFIG')
+        ok(await tp.evaluate("CONFIG.productLines.map(p=>p.id).join(',')")=='juice,coconut,canned,dairy' and await tp.locator('#fLine').count()==0,'product lines are listed and there is no product-line filter yet')
+        await tp.close()
         # mobile overflow
         m=await b.new_page(viewport={'width':375,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
         ow=await m.evaluate("document.documentElement.scrollWidth");ok(await m.locator('.rc').count()==5,'recency chips on mobile');ok(ow<=375 and await m.locator('#health svg').is_visible(),f'gauge visible, no horizontal overflow at 375px (scrollWidth {ow})')
@@ -336,15 +362,47 @@ async def main():
             iw=min(r['issue'] for r in info['rows']); lw=min(r['line'] for r in info['rows']); dw=min(r['id'] for r in info['rows']); tw=min(r['idText'] for r in info['rows'])
             ok(len(info['rows'])>=8 and info['scroll']<=390 and iw>=220 and lw>=120 and dw>=120 and tw>=36 and all(r['idLines']==1 for r in info['rows']),
                f'complaint rows readable at 390px {lg}: issue-cell {iw:.0f}px line {lw:.0f}px id-cell {dw:.0f}px id-text {tw:.0f}px scroll {info["scroll"]}')
-            sel=cm.locator('#cBody select[data-k=status]').first
-            await sel.select_option('Investigating')
-            ok(await sel.input_value()=='Investigating','status select works in the phone complaint card')
+            want='ใหม่' if lg=='th' else 'New'
+            ok((await cm.locator('#cBody .stfix').first.inner_text()).strip()==want and await cm.locator('#cBody select').count()==0,'status is a read-only label on the phone complaint card')
+            ok(await cm.locator('#cBody .ow').count()>=8,'phone complaint cards show a fixed owner')
             await cm.close()
         dk=await b.new_page(viewport={'width':1280,'height':800});await dk.goto(URL,wait_until='networkidle');await dk.wait_for_timeout(400)
         desk=await dk.evaluate("""() => {const td=document.querySelector('#cBody td');const th=document.querySelector('#complaints thead');
           return {td:getComputedStyle(td).display, th:getComputedStyle(th).display, issue:document.querySelector('#cBody td:nth-child(5)').getBoundingClientRect().width, clab:getComputedStyle(document.querySelector('#cBody .clab')).display}}""")
         ok(desk['td']=='table-cell' and desk['th']=='table-header-group' and desk['clab']=='none' and desk['issue']>300, f'desktop complaints table unchanged {desk}')
         await dk.close()
+        prn=await b.new_page(viewport={'width':1280,'height':800})
+        await prn.goto(URL+'?lang=en&period=12m',wait_until='networkidle');await prn.wait_for_timeout(300)
+        ok((await prn.locator('#printBtn').inner_text()).strip()=='Print / Save PDF','print button is present')
+        await prn.select_option('#fBrand','Malee');await prn.wait_for_timeout(100)
+        await prn.emulate_media(media='print');await prn.evaluate('printSummary()');await prn.wait_for_timeout(100)
+        head=await prn.text_content('#printHead')
+        ok('Printed view' in head and 'Malee' in head and '12 months' in head,'print heading states the current filters: '+head[:120])
+        ok(not await prn.locator('.filters').is_visible() and await prn.locator('#cSov').is_visible(),'print hides filters and keeps charts')
+        ok(await prn.evaluate("""()=>[...document.styleSheets].some(s=>{try{return [...s.cssRules].some(r=>(r.cssText||'').toLowerCase().includes('a4 landscape'))}catch(e){return false}})"""),'print page is A4 landscape')
+        await prn.close()
+        kw=await b.new_page(viewport={'width':1280,'height':800})
+        await kw.goto(URL+'?lang=en&period=all',wait_until='networkidle');await kw.wait_for_timeout(300)
+        n0=await cnt(kw)
+        chip=kw.locator('#kw button[data-q]:not([data-q=""])').first
+        q=await chip.get_attribute('data-q')
+        await chip.click();await kw.wait_for_timeout(200)
+        n1=await cnt(kw)
+        ok(n1!=n0 and await kw.input_value('#fQ')==q and await kw.locator('#kwClear').is_visible() and await kw.locator(f'#kw button[data-q="{q}"]').get_attribute('aria-pressed')=='true','keyword chip filters the overview')
+        await kw.fill('#fFrom','2020-01-01');await kw.dispatch_event('#fFrom','change');await kw.wait_for_timeout(150)
+        n_date=await cnt(kw)
+        ok(await kw.input_value('#fFrom')=='2020-01-01' and n_date<=n1,'date filter stays available with the keyword')
+        await kw.click('#kwClear');await kw.wait_for_timeout(200)
+        ok(await kw.input_value('#fQ')=='' and not await kw.locator('#kwClear').is_visible() and await kw.input_value('#fFrom')=='2020-01-01','clearing the keyword keeps the date and the other filters')
+        await kw.fill('#fFrom','');await kw.dispatch_event('#fFrom','change');await kw.wait_for_timeout(150)
+        ok(await cnt(kw)==n0,'clearing the keyword restores the full overview')
+        chip=kw.locator(f'#kw button[data-q="{q}"]')
+        await chip.click();await kw.wait_for_timeout(150);await chip.click();await kw.wait_for_timeout(200)
+        ok(await kw.input_value('#fQ')=='' and await cnt(kw)==n0,'clicking the active keyword toggles it off')
+        await kw.fill('#fFrom','2020-01-01');await kw.dispatch_event('#fFrom','change');await kw.wait_for_timeout(100)
+        await kw.click('#hDrvA');await kw.wait_for_timeout(200)
+        ok(await kw.input_value('#fFrom')=='2020-01-01' and await kw.input_value('#fTopic')!='','a topic link keeps the date range')
+        await kw.close()
         ph=await b.new_page(viewport={'width':390,'height':844},is_mobile=True)
         await ph.goto(URL+'?lang=en&period=all',wait_until='networkidle');await ph.wait_for_timeout(300)
         ok(await ph.evaluate('''()=>{const r=DATA.find(x=>x.id==="M859204");r.complaint=true;r.severity="Low";shown=300;render();const row=[...document.querySelectorAll("#cBody tr")].find(tr=>tr.textContent.includes("M859204"));const bad=row.querySelector(".lbad");const src=row.children[8];return getComputedStyle(row).display==="grid"&&src.contains(bad)&&bad.textContent.includes("source removed")&&document.documentElement.scrollWidth<=390}'''),'phone complaint card shows the removed badge in the source cell')
