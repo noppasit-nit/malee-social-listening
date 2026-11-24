@@ -117,6 +117,18 @@ html[lang=th] header h1,html[lang=th] header .th,html[lang=th] .hh,html[lang=th]
 .ownf{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut);margin:-2px 0 10px}
 .ownf select{min-width:180px;max-width:100%}
 .stfix{font-weight:600}
+.printonly{display:none}
+@page{size:A4 landscape;margin:10mm}
+@media print{
+.printonly{display:block !important}
+.filters,nav.jump,.lsw,.ownf,.prow,.rrow,.sortl,button,.more,footer{display:none !important}
+select,input{display:none !important}
+body{background:#fff}
+#printHead{font-size:12px;margin:0 0 10px;color:#1d2b22}
+main > section, #healthWrap{break-before:page;page-break-before:always}
+#healthWrap{break-before:auto;page-break-before:auto}
+.cv{height:200px}
+}
 .prow{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:2px 0 0}
 .prow .chk{padding-top:0}
 .ptag{font-size:10px;font-weight:700;letter-spacing:.02em;border-radius:6px;padding:1px 6px;background:#eef1f4;color:#46524a;white-space:nowrap}
@@ -131,6 +143,7 @@ html[lang=th] header h1,html[lang=th] header .th,html[lang=th] .hh,html[lang=th]
 <div class="badges"><span class="badge" data-i="b_mock"></span><span class="badge" data-i="b_n"></span><span class="badge pbadge" id="pBadge"></span><span class="badge" data-i="b_coll"></span><span class="badge" data-i="b_plat"></span></div>
 <nav class="jump"><a href="#kpi" data-i="n_over"></a><a href="#recs" data-i="n_recs"></a><a href="#alerts" data-i="n_alerts"></a><a href="#charts" data-i="n_charts"></a><a href="#complaints" data-i="n_comp"></a><a href="#feed" data-i="n_feed"></a><a href="#platforms" data-i="n_plat"></a><a href="#method" data-i="n_method"></a></nav>
 </div></header>
+<p id="printHead" class="printonly"></p>
 <section class="wrap" id="healthWrap" data-ia="a_health"><div class="health" id="health">
 <div class="hg"><div class="hrow"><label class="hbl"><span data-i="h_brand"></span><select id="hBrand"></select></label><div class="ptog" role="group" id="ptog" data-ia="p_group"><button type="button" data-p="12m" aria-pressed="true" data-i="p_12m"></button><button type="button" data-p="all" aria-pressed="false" data-i="p_all"></button></div></div>
 <p class="hh"><b id="hTitle"></b><br><span id="hSub"></span></p>
@@ -162,7 +175,7 @@ html[lang=th] header h1,html[lang=th] header .th,html[lang=th] .hh,html[lang=th]
 <label><span data-i="f_to"></span><input type="date" id="fTo"></label>
 <label><span data-i="f_q"></span><input type="text" id="fQ" data-iph="f_qph"></label>
 <label class="chk"><input type="checkbox" id="fComp"> <span data-i="f_comp"></span></label>
-<button class="ghost" id="reset" data-i="reset"></button><button id="csv" data-i="csv"></button>
+<button class="ghost" id="reset" data-i="reset"></button><button id="csv" data-i="csv"></button><button class="ghost" id="printBtn" type="button" data-i="print"></button>
 <label class="sortl"><span data-i="f_sort"></span><select id="fSort" data-ia="f_sort"></select></label>
 <span class="count" id="count"></span>
 </div><div class="prow" id="ptype" role="group" data-ia="pt_group"><label class="chk"><input type="checkbox" data-pt="Public" checked> <span data-i="pt_Public"></span></label><label class="chk"><input type="checkbox" data-pt="Brand" checked> <span data-i="pt_Brand"></span></label><label class="chk"><input type="checkbox" data-pt="Paid" checked> <span data-i="pt_Paid"></span></label><label class="chk"><input type="checkbox" data-pt="News" checked> <span data-i="pt_News"></span></label></div><div class="rrow" role="group" data-ia="rc_group"><span class="lab" data-i="rc_lab"></span><button type="button" class="rc" data-rc="" aria-pressed="true"><span data-i="rc_all"></span><em id="rcAll"></em></button><button type="button" class="rc" data-rc="7" aria-pressed="false"><span data-i="rc_7"></span><em id="rc7"></em></button><button type="button" class="rc" data-rc="30" aria-pressed="false"><span data-i="rc_30"></span><em id="rc30"></em></button><button type="button" class="rc" data-rc="365" aria-pressed="false"><span data-i="rc_365"></span><em id="rc365"></em></button><button type="button" class="rc" data-rc="old" aria-pressed="false"><span data-i="rc_old"></span><em id="rcold"></em><span class="hint" id="rcoldH"></span></button></div>
@@ -255,7 +268,7 @@ how_s:['How this is calculated','วิธีคำนวณ'],
 k_sev:['Severe open issues','ประเด็นร้ายแรงที่ยังเปิดอยู่'],k_tr:[()=>PERIOD==='all'?'Last 30 days vs all time':'Last 30 days vs 12 months',()=>PERIOD==='all'?'30 วันล่าสุด เทียบกับทั้งหมด':'30 วันล่าสุด เทียบกับ 12 เดือน'],
 hc_t:['Same score for every brand','คะแนนเดียวกันของทุกแบรนด์'],hc_s:['n = mentions · tap a brand to switch','n = จำนวนการพูดถึง · แตะชื่อแบรนด์เพื่อสลับ'],
 f_brand:['Brand','แบรนด์'],f_plat:['Platform','แพลตฟอร์ม'],f_sent:['Sentiment','ความรู้สึก'],f_topic:['Topic','หัวข้อ'],f_from:['From','ตั้งแต่'],f_to:['To','ถึง'],f_q:['Search','ค้นหา'],f_qph:['e.g. matcha, เชื้อรา, 7-11','เช่น มัทฉะ, เชื้อรา, 7-11'],
-f_comp:['Complaints only','เฉพาะคำร้องเรียน'],f_owner:['Owner','ผู้รับผิดชอบ'],pt_group:['Post type','ชนิดโพสต์'],pt_Public:['Public','สาธารณะ'],pt_Brand:['Brand','แบรนด์'],pt_Paid:['Paid','โฆษณา'],pt_News:['News','ข่าว'],reset:['Reset','ล้างตัวกรอง'],csv:['⬇ Export CSV','⬇ ส่งออก CSV'],f_sort:['Sort','เรียง'],
+f_comp:['Complaints only','เฉพาะคำร้องเรียน'],f_owner:['Owner','ผู้รับผิดชอบ'],pt_group:['Post type','ชนิดโพสต์'],pt_Public:['Public','สาธารณะ'],pt_Brand:['Brand','แบรนด์'],pt_Paid:['Paid','โฆษณา'],pt_News:['News','ข่าว'],reset:['Reset','ล้างตัวกรอง'],csv:['⬇ Export CSV','⬇ ส่งออก CSV'],print:['Print / Save PDF','พิมพ์ / บันทึก PDF'],f_sort:['Sort','เรียง'],
 rc_group:['Filter by recency','กรองตามความใหม่'],rc_lab:['Recency','ความใหม่'],rc_all:['All','ทั้งหมด'],rc_7:['Last 7d','7 วันล่าสุด'],rc_30:['Last 30d','30 วันล่าสุด'],rc_365:['This year','ภายใน 1 ปี'],rc_old:['Older','เก่ากว่า'],
 k_new:['New this week','ใหม่ใน 7 วัน'],k_m:['Mentions','จำนวนการพูดถึง'],k_n:['Net sentiment','ความรู้สึกสุทธิ'],k_ns:['% positive − % negative','% เชิงบวก − % เชิงลบ'],k_c:['Complaints','คำร้องเรียน'],k_t:['Top issue','ประเด็นหลัก'],k_s:['Malee share of voice','สัดส่วนการพูดถึงของมาลี'],k_ss:['of brand mentions in view','ของการพูดถึงแบรนด์ที่แสดงอยู่'],
 lg_t:['Labels','ป้ายความใหม่'],r_new:['NEW','ใหม่'],r_recent:['Recent','ล่าสุด'],r_year:['This year','ปีนี้'],r_old13:['Old · 2013','เก่า · 2013'],r_unk:['Date unknown','ไม่ทราบวันที่'],
@@ -518,6 +531,8 @@ document.querySelectorAll('.rc').forEach(b=>b.onclick=()=>{if(b.dataset.rc==='ol
 $('fSort').onchange=()=>{shown=12;render()};$('hBrand').onchange=()=>setHB($('hBrand').value);
 $('lsw').querySelectorAll('button').forEach(x=>x.onclick=()=>setLang(x.dataset.lang));$('ptog').querySelectorAll('button').forEach(x=>x.onclick=()=>setPeriod(x.dataset.p));$('hOld').onclick=()=>setPeriod('all');
 if(QS.get('lang'))ls('malee-sl-lang',LANG);if(QS.get('period'))ls('malee-sl-period',PERIOD);if(QS.get('brand')&&HBR.includes(QS.get('brand')))ls('malee-sl-brand',HB);
+function printSummary(){const sel=id=>{const e=$(id);return e&&e.selectedOptions&&e.selectedOptions[0]?e.selectedOptions[0].text:''};const types=[...document.querySelectorAll('#ptype input:checked')].map(i=>{const x=PTL[i.dataset.pt];return x?L(x[0],x[1]):''});const bits=[PERIOD==='all'?L('All time','ทั้งหมด'):L('Last 12 months','12 เดือนล่าสุด'),sel('fBrand'),sel('fPlat'),sel('fSent'),sel('fTopic'),($('fFrom').value||'…')+'–'+($('fTo').value||'…'),$('fQ').value||L('No keyword','ไม่มีคำค้น'),types.filter(Boolean).join(', ')];$('printHead').textContent=L('Printed view','มุมที่พิมพ์')+' · '+bits.join(' · ')}
+$('printBtn').onclick=()=>{printSummary();window.print()};window.addEventListener('beforeprint',printSummary);
 applyLang();renderHealth();render();
 </script>
 </body></html>

@@ -224,7 +224,7 @@ async def main():
         pq=await b.new_page();await pq.goto(URL+'?brand=Cocomax&period=all',wait_until='networkidle');ok(await pq.input_value('#hBrand')=='Cocomax' and await pq.text_content('#gScore')==str(hsb('Cocomax')[1]),'?brand= works');
         await pq.goto(URL+'?brand=Nope',wait_until='networkidle');ok(await pq.input_value('#hBrand') in ['Cocomax','Malee'],'invalid ?brand= ignored');await pq.close()
         # ---- language ----
-        WL=set("""Malee Coco Tipco Doi Kham Cocomax Chaokoh Pantip Google Facebook Instagram Lemon8 TikTok YouTube LINE Teams API CSV KPI PETA Thai PBS TCC ISRA News CIRA QR SOP CRM DM QA PR IT R&D CSR FDA UHT NFC PDPA UTC Grok Bot GitHub Actions Meta Graph Research Business Profile Shopee Lazada OA Wisesight Zocial Eye Mandala Brandwatch Talkwalker Meltwater CrowdTangle Thansettakij Post Today The Thaiger TrueID Shorts data json mentions csv MOCK Plus Eleven Matcha UK EN Lemon Maps""".split())
+        WL=set("""Malee Coco Tipco Doi Kham Cocomax Chaokoh Pantip Google Facebook Instagram Lemon8 TikTok YouTube LINE Teams API CSV KPI PETA Thai PBS TCC ISRA News CIRA QR SOP CRM DM QA PR IT R&D CSR FDA UHT NFC PDPA UTC Grok Bot GitHub Actions Meta Graph Research Business Profile Shopee Lazada OA Wisesight Zocial Eye Mandala Brandwatch Talkwalker Meltwater CrowdTangle Thansettakij Post Today The Thaiger TrueID Shorts data json mentions csv MOCK PDF Plus Eleven Matcha UK EN Lemon Maps""".split())
         async def leftovers(pp):
             return await pp.evaluate("""wl=>{const out=[];const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode()){const e=n.parentElement;if(!e||e.closest('.c,script,style,svg title,option:not(:checked)'))continue;if(!e.getClientRects().length)continue;const cs=getComputedStyle(e);if(cs.visibility==='hidden')continue;(n.textContent.match(/[A-Za-z][A-Za-z&]{2,}/g)||[]).forEach(t=>{if(!wl.includes(t))out.push(t)})}
             document.querySelectorAll('[placeholder],[aria-label],select').forEach(e=>{let v=e.tagName==='SELECT'?(e.selectedOptions[0]||{}).text||'':(e.getAttribute('placeholder')||'')+' '+(e.getAttribute('aria-label')||'');v=v.replace(/\\bM[0-9a-f]{6}\\b/g,'');(v.match(/[A-Za-z][A-Za-z&]{2,}/g)||[]).forEach(t=>{if(!wl.includes(t))out.push('@'+t)})});return [...new Set(out)]}""",list(WL))
@@ -371,6 +371,16 @@ async def main():
           return {td:getComputedStyle(td).display, th:getComputedStyle(th).display, issue:document.querySelector('#cBody td:nth-child(5)').getBoundingClientRect().width, clab:getComputedStyle(document.querySelector('#cBody .clab')).display}}""")
         ok(desk['td']=='table-cell' and desk['th']=='table-header-group' and desk['clab']=='none' and desk['issue']>300, f'desktop complaints table unchanged {desk}')
         await dk.close()
+        prn=await b.new_page(viewport={'width':1280,'height':800})
+        await prn.goto(URL+'?lang=en&period=12m',wait_until='networkidle');await prn.wait_for_timeout(300)
+        ok((await prn.locator('#printBtn').inner_text()).strip()=='Print / Save PDF','print button is present')
+        await prn.select_option('#fBrand','Malee');await prn.wait_for_timeout(100)
+        await prn.emulate_media(media='print');await prn.evaluate('printSummary()');await prn.wait_for_timeout(100)
+        head=await prn.text_content('#printHead')
+        ok('Printed view' in head and 'Malee' in head and '12 months' in head,'print heading states the current filters: '+head[:120])
+        ok(not await prn.locator('.filters').is_visible() and await prn.locator('#cSov').is_visible(),'print hides filters and keeps charts')
+        ok(await prn.evaluate("""()=>[...document.styleSheets].some(s=>{try{return [...s.cssRules].some(r=>(r.cssText||'').toLowerCase().includes('a4 landscape'))}catch(e){return false}})"""),'print page is A4 landscape')
+        await prn.close()
         ph=await b.new_page(viewport={'width':390,'height':844},is_mobile=True)
         await ph.goto(URL+'?lang=en&period=all',wait_until='networkidle');await ph.wait_for_timeout(300)
         ok(await ph.evaluate('''()=>{const r=DATA.find(x=>x.id==="M859204");r.complaint=true;r.severity="Low";shown=300;render();const row=[...document.querySelectorAll("#cBody tr")].find(tr=>tr.textContent.includes("M859204"));const bad=row.querySelector(".lbad");const src=row.children[8];return getComputedStyle(row).display==="grid"&&src.contains(bad)&&bad.textContent.includes("source removed")&&document.documentElement.scrollWidth<=390}'''),'phone complaint card shows the removed badge in the source cell')
