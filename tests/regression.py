@@ -320,6 +320,37 @@ async def main():
         m=await b.new_page(viewport={'width':375,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
         ow=await m.evaluate("document.documentElement.scrollWidth");ok(await m.locator('.rc').count()==5,'recency chips on mobile');ok(ow<=375 and await m.locator('#health svg').is_visible(),f'gauge visible, no horizontal overflow at 375px (scrollWidth {ow})')
         wide=await m.evaluate("[...document.querySelectorAll('main *')].filter(e=>e.getBoundingClientRect().right>377&&!e.closest('.tbl')).length");ok(wide==0,f'no element wider than viewport outside scroll tables ({wide})')
+        # complaints must stay readable on a phone: columns used to collapse to ~24px / ~46px and wrap one letter per line
+        for lg in ['en','th']:
+            cm=await b.new_page(viewport={'width':390,'height':844},is_mobile=True);await cm.goto(URL+f'?lang={lg}&period=all',wait_until='networkidle');await cm.wait_for_timeout(400)
+            info=await cm.evaluate("""() => {
+              const rows=[...document.querySelectorAll('#cBody tr')].filter(tr=>tr.children.length>5);
+              const lines=el=>{const t=[...el.childNodes].find(n=>n.nodeType===3&&n.textContent.trim())||el;const r=document.createRange();r.selectNodeContents(t);return [...r.getClientRects()].filter(x=>x.width>1)};
+              return {scroll:document.documentElement.scrollWidth, rows:rows.map(tr=>{
+                const id=tr.children[0], issueTd=tr.children[4], issue=issueTd.querySelector('.c');
+                const idLines=lines(id), issueLines=lines(issue);
+                return {id:id.getBoundingClientRect().width, idText:idLines[0]?idLines[0].width:0, idLines:idLines.length,
+                  issue:issueTd.getBoundingClientRect().width, line:issueLines.reduce((m,x)=>Math.max(m,x.width),0)};
+              })};
+            }""")
+            iw=min(r['issue'] for r in info['rows']); lw=min(r['line'] for r in info['rows']); dw=min(r['id'] for r in info['rows']); tw=min(r['idText'] for r in info['rows'])
+            ok(len(info['rows'])>=8 and info['scroll']<=390 and iw>=220 and lw>=120 and dw>=120 and tw>=36 and all(r['idLines']==1 for r in info['rows']),
+               f'complaint rows readable at 390px {lg}: issue-cell {iw:.0f}px line {lw:.0f}px id-cell {dw:.0f}px id-text {tw:.0f}px scroll {info["scroll"]}')
+            sel=cm.locator('#cBody select[data-k=status]').first
+            await sel.select_option('Investigating')
+            ok(await sel.input_value()=='Investigating','status select works in the phone complaint card')
+            await cm.close()
+        dk=await b.new_page(viewport={'width':1280,'height':800});await dk.goto(URL,wait_until='networkidle');await dk.wait_for_timeout(400)
+        desk=await dk.evaluate("""() => {const td=document.querySelector('#cBody td');const th=document.querySelector('#complaints thead');
+          return {td:getComputedStyle(td).display, th:getComputedStyle(th).display, issue:document.querySelector('#cBody td:nth-child(5)').getBoundingClientRect().width, clab:getComputedStyle(document.querySelector('#cBody .clab')).display}}""")
+        ok(desk['td']=='table-cell' and desk['th']=='table-header-group' and desk['clab']=='none' and desk['issue']>300, f'desktop complaints table unchanged {desk}')
+        await dk.close()
+        ph=await b.new_page(viewport={'width':390,'height':844},is_mobile=True)
+        await ph.goto(URL+'?lang=en&period=all',wait_until='networkidle');await ph.wait_for_timeout(300)
+        ok(await ph.evaluate('''()=>{const r=DATA.find(x=>x.id==="M859204");r.complaint=true;r.severity="Low";shown=300;render();const row=[...document.querySelectorAll("#cBody tr")].find(tr=>tr.textContent.includes("M859204"));const bad=row.querySelector(".lbad");const src=row.children[8];return getComputedStyle(row).display==="grid"&&src.contains(bad)&&bad.textContent.includes("source removed")&&document.documentElement.scrollWidth<=390}'''),'phone complaint card shows the removed badge in the source cell')
+        await ph.goto(URL+'?lang=th&period=all',wait_until='networkidle');await ph.wait_for_timeout(300)
+        ok(await ph.evaluate('''()=>{const r=DATA.find(x=>x.id==="M859204");r.complaint=true;r.severity="Low";shown=300;render();const row=[...document.querySelectorAll("#cBody tr")].find(tr=>tr.textContent.includes("M859204"));const bad=row.querySelector(".lbad");return row.children[8].contains(bad)&&bad.textContent.includes("แหล่งที่มาถูกลบ")&&document.documentElement.scrollWidth<=390}'''),'phone complaint card shows the Thai removed badge')
+        await ph.close()
         await b.close()
     print(f'\n{len(fails)} failure(s)');sys.exit(1 if fails else 0)
 asyncio.run(main())
