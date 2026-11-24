@@ -60,10 +60,18 @@ async def main():
         ok(raw.startswith(b'\xef\xbb\xbf'),'CSV has UTF-8 BOM');txt=raw.decode('utf-8-sig')
         ok(not re.search(r'(^|,)"[=+\-@]',txt,re.M),'CSV cells guarded against formula injection')
         ok('น้ำ' in txt,'CSV keeps Thai text')
-        # status persistence
-        sel=pg.locator('#cBody select[data-k=status]').first;sid=await sel.get_attribute('data-id');await sel.select_option('Responded')
-        await pg.reload(wait_until='networkidle');await pg.wait_for_timeout(400)
-        ok(await pg.eval_on_selector(f'select[data-id="{sid}"][data-k=status]','e=>e.value')=='Responded','status persists after reload')
+        # owner is fixed from the topic; status is read-only New
+        sid='Mc25f88'
+        ok(await pg.locator('#cBody select[data-k=status]').count()==0 and await pg.locator('#cBody select[data-k=owner]').count()==0,'owner and status are not dropdowns')
+        st_txt=await pg.locator('#cBody .stfix').all_inner_texts()
+        ok(st_txt and set(t.strip() for t in st_txt)=={'New'},'every complaint status is New')
+        ok(await pg.evaluate('''()=>{const row=[...document.querySelectorAll('#cBody tr')].find(tr=>tr.textContent.includes('Mc25f88'));return ownerOf(DATA.find(r=>r.id==='Mc25f88'))==='Sales'&&row.querySelector('.ow').textContent==='Sales'}'''),'a price complaint is owned by Sales')
+        ok(await pg.evaluate("ownerOf(DATA.find(r=>r.id==='Maf26d9'))")=='Packaging / R&D','packaging beats availability for the owner')
+        ok(await pg.evaluate("ownerOf(DATA.find(r=>r.id==='Ma73837'))")=='QA / Food Safety','contamination is owned by QA')
+        n_qa=sum(1 for r in D if r['complaint'] and ( (lambda tags: next((o for t,o in [('quality/contamination','QA / Food Safety'),('ethics','Sustainability / CSR'),('taste','R&D / Brand'),('quality','R&D / Brand'),('packaging','Packaging / R&D'),('service','Customer Care'),('price','Sales'),('availability','Trade'),('health/sugar','R&D / Brand'),('promo','Brand / Marketing')] if t in tags),'Customer Care'))(r.get('tags') or []) )=='QA / Food Safety')
+        await pg.select_option('#fOwner','QA / Food Safety');await pg.wait_for_timeout(150)
+        ok(await pg.locator('#cBody tr').count()==n_qa,'owner filter keeps only that owner')
+        await pg.select_option('#fOwner','');await pg.wait_for_timeout(100)
         # corrupt storage
         for bad in ['null','[]','not json{','{"x":5}','{"%s":{"status":"<img>"}}'%sid]:
             await pg.evaluate("v=>localStorage.setItem('malee-sl-v1',v)",bad);e0=len(errs)
@@ -135,11 +143,11 @@ async def main():
         ok(str(s30) in tr and (('▲' in tr) if s30-sc>3 else ('▼' in tr) if s30-sc<-3 else ('►' in tr)),f'30-day trend {s30} vs {sc}: {tr}')
         sevn=sum(1 for r in D if 'Malee' in r['brand'] and r['complaint'] and r.get('severity')=='High')
         ok(await pg.text_content('#hSev')==str(sevn),f'severe open issues {sevn}')
-        sel=pg.locator('#cBody tr:has-text("Malee") select[data-k=status]');k=0
-        for i in range(await sel.count()):
-            rid=await sel.nth(i).get_attribute('data-id');rr=[r for r in D if r['id']==rid][0]
-            if rr.get('severity')=='High':await sel.nth(i).select_option('Closed');k=1;break
-        if k: ok(await pg.text_content('#hSev')==str(sevn-1),'closing a severe issue lowers the count')
+        hid=next(r['id'] for r in D if 'Malee' in r['brand'] and r['complaint'] and r.get('severity')=='High')
+        await pg.evaluate("(id)=>{window.MALEE_STATUS={[id]:'Closed'};renderHealth()}",hid)
+        ok(await pg.text_content('#hSev')==str(sevn-1),'a pilot sheet status of Closed lowers the severe count')
+        await pg.evaluate("()=>{delete window.MALEE_STATUS;renderHealth()}")
+        ok(await pg.text_content('#hSev')==str(sevn),'clearing the sheet status restores the count')
         await pg.evaluate("localStorage.removeItem('malee-sl-v1')")
         ok(await pg.locator('#health details.how summary').count()==1,'formula expander present')
         await pg.click('#hDrvA');await pg.wait_for_timeout(300);tag=await pg.get_attribute('#hDrvA','data-tag')
@@ -336,9 +344,9 @@ async def main():
             iw=min(r['issue'] for r in info['rows']); lw=min(r['line'] for r in info['rows']); dw=min(r['id'] for r in info['rows']); tw=min(r['idText'] for r in info['rows'])
             ok(len(info['rows'])>=8 and info['scroll']<=390 and iw>=220 and lw>=120 and dw>=120 and tw>=36 and all(r['idLines']==1 for r in info['rows']),
                f'complaint rows readable at 390px {lg}: issue-cell {iw:.0f}px line {lw:.0f}px id-cell {dw:.0f}px id-text {tw:.0f}px scroll {info["scroll"]}')
-            sel=cm.locator('#cBody select[data-k=status]').first
-            await sel.select_option('Investigating')
-            ok(await sel.input_value()=='Investigating','status select works in the phone complaint card')
+            want='ใหม่' if lg=='th' else 'New'
+            ok((await cm.locator('#cBody .stfix').first.inner_text()).strip()==want and await cm.locator('#cBody select').count()==0,'status is a read-only label on the phone complaint card')
+            ok(await cm.locator('#cBody .ow').count()>=8,'phone complaint cards show a fixed owner')
             await cm.close()
         dk=await b.new_page(viewport={'width':1280,'height':800});await dk.goto(URL,wait_until='networkidle');await dk.wait_for_timeout(400)
         desk=await dk.evaluate("""() => {const td=document.querySelector('#cBody td');const th=document.querySelector('#complaints thead');
