@@ -30,6 +30,9 @@ section{margin:18px 0}h2{font-size:17px;margin:0 0 10px;display:flex;align-items
 .alerts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.alert{border-radius:var(--r);padding:12px 14px;border:1px solid}.alert b{display:block;margin-bottom:3px}
 .a-high{background:#fdecec;border-color:#f3c2c2}.a-med{background:var(--o2);border-color:#f6d3a8}.a-info{background:var(--g2);border-color:#bfe3cc}.alert .am{font-size:12px;color:var(--mut);margin-top:4px}
 .kw{display:flex;flex-wrap:wrap;gap:6px}.kw .kwb{font:inherit;background:var(--g2);color:#0a5f32;border-radius:20px;padding:3px 10px;cursor:pointer;border:1px solid #cfe9d9}.kw .kwb em{font-style:normal;color:var(--mut);font-size:11px;margin-left:4px}
+.kw .kwb[aria-pressed=true]{background:var(--g);color:#fff;border-color:var(--g)}
+.kw .kwb[aria-pressed=true] em{color:#e6f4ec}
+#kwClear[hidden]{display:none !important}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em}
 .tbl{overflow-x:auto}td select{min-width:120px;padding:4px 6px}
 .sev{font-size:11px;font-weight:600;border-radius:6px;padding:2px 7px}.sev.High{background:#fdecec;color:var(--neg)}.sev.Medium{background:var(--o2);color:#b5600a}.sev.Low{background:#eef1f4;color:#4a5866}
@@ -174,6 +177,7 @@ main > section, #healthWrap{break-before:page;page-break-before:always}
 <label><span data-i="f_from"></span><input type="date" id="fFrom"></label>
 <label><span data-i="f_to"></span><input type="date" id="fTo"></label>
 <label><span data-i="f_q"></span><input type="text" id="fQ" data-iph="f_qph"></label>
+<button type="button" class="ghost" id="kwClear" hidden data-i="kw_clear"></button>
 <label class="chk"><input type="checkbox" id="fComp"> <span data-i="f_comp"></span></label>
 <button class="ghost" id="reset" data-i="reset"></button><button id="csv" data-i="csv"></button><button class="ghost" id="printBtn" type="button" data-i="print"></button>
 <label class="sortl"><span data-i="f_sort"></span><select id="fSort" data-ia="f_sort"></select></label>
@@ -267,7 +271,7 @@ h_brand:['Brand','แบรนด์'],
 how_s:['How this is calculated','วิธีคำนวณ'],
 k_sev:['Severe open issues','ประเด็นร้ายแรงที่ยังเปิดอยู่'],k_tr:[()=>PERIOD==='all'?'Last 30 days vs all time':'Last 30 days vs 12 months',()=>PERIOD==='all'?'30 วันล่าสุด เทียบกับทั้งหมด':'30 วันล่าสุด เทียบกับ 12 เดือน'],
 hc_t:['Same score for every brand','คะแนนเดียวกันของทุกแบรนด์'],hc_s:['n = mentions · tap a brand to switch','n = จำนวนการพูดถึง · แตะชื่อแบรนด์เพื่อสลับ'],
-f_brand:['Brand','แบรนด์'],f_plat:['Platform','แพลตฟอร์ม'],f_sent:['Sentiment','ความรู้สึก'],f_topic:['Topic','หัวข้อ'],f_from:['From','ตั้งแต่'],f_to:['To','ถึง'],f_q:['Search','ค้นหา'],f_qph:['e.g. matcha, เชื้อรา, 7-11','เช่น มัทฉะ, เชื้อรา, 7-11'],
+f_brand:['Brand','แบรนด์'],f_plat:['Platform','แพลตฟอร์ม'],f_sent:['Sentiment','ความรู้สึก'],f_topic:['Topic','หัวข้อ'],f_from:['From','ตั้งแต่'],f_to:['To','ถึง'],f_q:['Search','ค้นหา'],f_qph:['e.g. matcha, เชื้อรา, 7-11','เช่น มัทฉะ, เชื้อรา, 7-11'],kw_clear:['Clear filter ✕','ล้างตัวกรอง ✕'],
 f_comp:['Complaints only','เฉพาะคำร้องเรียน'],f_owner:['Owner','ผู้รับผิดชอบ'],pt_group:['Post type','ชนิดโพสต์'],pt_Public:['Public','สาธารณะ'],pt_Brand:['Brand','แบรนด์'],pt_Paid:['Paid','โฆษณา'],pt_News:['News','ข่าว'],reset:['Reset','ล้างตัวกรอง'],csv:['⬇ Export CSV','⬇ ส่งออก CSV'],print:['Print / Save PDF','พิมพ์ / บันทึก PDF'],f_sort:['Sort','เรียง'],
 rc_group:['Filter by recency','กรองตามความใหม่'],rc_lab:['Recency','ความใหม่'],rc_all:['All','ทั้งหมด'],rc_7:['Last 7d','7 วันล่าสุด'],rc_30:['Last 30d','30 วันล่าสุด'],rc_365:['This year','ภายใน 1 ปี'],rc_old:['Older','เก่ากว่า'],
 k_new:['New this week','ใหม่ใน 7 วัน'],k_m:['Mentions','จำนวนการพูดถึง'],k_n:['Net sentiment','ความรู้สึกสุทธิ'],k_ns:['% positive − % negative','% เชิงบวก − % เชิงลบ'],k_c:['Complaints','คำร้องเรียน'],k_t:['Top issue','ประเด็นหลัก'],k_s:['Malee share of voice','สัดส่วนการพูดถึงของมาลี'],k_ss:['of brand mentions in view','ของการพูดถึงแบรนด์ที่แสดงอยู่'],
@@ -405,7 +409,7 @@ const Lx=Object.values(T);const up=Lx.filter(o=>o.side==='up').sort((a,b)=>b.pts
 const raw=den?50+Lx.reduce((a,o)=>a+o.pts,0):null;return {up,dn,raw,score:raw==null?null:Math.round(raw),n:rows.length}}
 const MIXK=['new','recent','year','old','unk'];const LOWN=10,MIN30=3;
 const fmt=x=>(x>=0?'+':'−')+Math.abs(x).toFixed(1);
-function goFeed(brand,sent,tag){$('reset').click();$('fBrand').value=brand;$('fSent').value=sent;$('fTopic').value=tag;render();$('feed').scrollIntoView({behavior:'smooth'})}
+function goFeed(brand,sent,tag){$('fBrand').value=brand;$('fSent').value=sent;$('fTopic').value=tag;shown=12;render();$('feed').scrollIntoView({behavior:'smooth'})}
 function renderWhy(){const b=HB,B0=bn(b),A=drivers(b),B=drivers(b,{max:30});if(A.score==null||A.n<MINP){$('why').innerHTML=`<h3>${L('Why this score?','ทำไมได้คะแนนนี้?')}</h3><p class="mx" id="whySum">${PERIOD==='all'?L(`Not enough data for ${B0} (n=${A.n}).`,`ข้อมูลของ${B0}ไม่พอ (n=${A.n})`):L(`Not enough data in the last 12 months for ${B0} (n=${A.n}). Switch to All time to see older mentions.`,`ข้อมูลของ${B0}ใน 12 เดือนล่าสุดไม่พอ (n=${A.n}) สลับเป็นทั้งหมดเพื่อดูรายการที่เก่ากว่า`)}</p>`;return}
 const bl=band(A.score)[1];const sumP=a=>a.reduce((x,o)=>x+o.pts,0);const U=sumP(A.up),Dn=sumP(A.dn);
 const oldShare=o=>((o.mix.old||0)+(o.mix.unk||0))/o.n;const recShare=o=>((o.mix.new||0)+(o.mix.recent||0))/o.n;
@@ -497,8 +501,10 @@ mk('cComp',{type:'bar',data:{labels:CT.map(tl),datasets:[{label:bn('Malee'),back
 const tm=cnt(R,r=>r.tags);const TT=TOPICS.filter(t=>tm[t]);
 mk('cTopic',{type:'bar',data:{labels:TT.map(tl),datasets:[{data:TT.map(t=>tm[t]),backgroundColor:'#3aa564'}]},options:{maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}}}});
 const kws=KW.map(([re,en,th])=>[TH()?th:en,R.filter(r=>new RegExp(re,'i').test(r.text+' '+r.en)).length,re]).filter(k=>k[1]).sort((a,b)=>b[1]-a[1]);
-$('kw').innerHTML=kws.map(k=>`<button type="button" class="kwb" data-q="${esc(k[2].split('|')[0])}" aria-label="${esc(L('Search ','ค้นหา ')+k[0])} (${k[1]})" style="font-size:${11+Math.min(8,k[1]/2)}px">${esc(k[0])}<em>${k[1]}</em></button>`).join('')||`<div class="empty">${L('No keywords','ไม่มีคำที่พบ')}</div>`;
-$('kw').querySelectorAll('button').forEach(s=>s.onclick=()=>{$('fQ').value=s.dataset.q;render()});
+const qNow=$('fQ').value.trim().toLowerCase();
+$('kw').innerHTML=`<button type="button" class="kwb" data-q="" aria-pressed="${qNow?'false':'true'}">${L('All','ทั้งหมด')}</button>`+kws.map(k=>{const dq=k[2].split('|')[0];const on=qNow&&qNow===dq.toLowerCase();return `<button type="button" class="kwb" data-q="${esc(dq)}" aria-pressed="${on?'true':'false'}" aria-label="${esc(L('Search ','ค้นหา ')+k[0])} (${k[1]})" style="font-size:${11+Math.min(8,k[1]/2)}px">${esc(k[0])}<em>${k[1]}</em></button>`}).join('');
+$('kwClear').hidden=!qNow;
+$('kw').querySelectorAll('button').forEach(s=>s.onclick=()=>{const dq=(s.dataset.q||'');const cur=$('fQ').value.trim();$('fQ').value=(!dq||cur.toLowerCase()===dq.toLowerCase())?'':dq;shown=12;render()});
 alerts(R);table(sortR(comp));feed(R);plat();}
 function alerts(R){const a=[];const c=R.filter(r=>r.complaint);
 const cont=c.filter(r=>r.tags.includes('quality/contamination'));if(cont.length){const lt=cont.map(r=>r.date.slice(0,10)).sort().pop();a.push(['a-high',L('🔴 Contamination keywords','🔴 คำเกี่ยวกับสิ่งปนเปื้อน'),L(`${cont.length} contamination complaints in view (mould / foreign object / fake coconut water). Latest: ${lt}. Rule: alert QA when ≥2 in 7 days.`,`มีคำร้องเรียนเรื่องสิ่งปนเปื้อน ${cont.length} รายการในมุมมองนี้ (เชื้อรา / สิ่งแปลกปลอม / น้ำมะพร้าวปลอม) ล่าสุด: ${lt} กฎ: แจ้ง QA เมื่อพบ ≥2 รายการใน 7 วัน`),cont[0]])}
@@ -533,6 +539,7 @@ $('lsw').querySelectorAll('button').forEach(x=>x.onclick=()=>setLang(x.dataset.l
 if(QS.get('lang'))ls('malee-sl-lang',LANG);if(QS.get('period'))ls('malee-sl-period',PERIOD);if(QS.get('brand')&&HBR.includes(QS.get('brand')))ls('malee-sl-brand',HB);
 function printSummary(){const sel=id=>{const e=$(id);return e&&e.selectedOptions&&e.selectedOptions[0]?e.selectedOptions[0].text:''};const types=[...document.querySelectorAll('#ptype input:checked')].map(i=>{const x=PTL[i.dataset.pt];return x?L(x[0],x[1]):''});const bits=[PERIOD==='all'?L('All time','ทั้งหมด'):L('Last 12 months','12 เดือนล่าสุด'),sel('fBrand'),sel('fPlat'),sel('fSent'),sel('fTopic'),($('fFrom').value||'…')+'–'+($('fTo').value||'…'),$('fQ').value||L('No keyword','ไม่มีคำค้น'),types.filter(Boolean).join(', ')];$('printHead').textContent=L('Printed view','มุมที่พิมพ์')+' · '+bits.join(' · ')}
 $('printBtn').onclick=()=>{printSummary();window.print()};window.addEventListener('beforeprint',printSummary);
+$('kwClear').onclick=()=>{$('fQ').value='';shown=12;render()};
 applyLang();renderHealth();render();
 </script>
 </body></html>
