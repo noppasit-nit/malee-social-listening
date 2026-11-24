@@ -339,6 +339,8 @@ async def main():
         ok(await cnt(tp)==len(D),'ticking every post type restores the full set')
         await tp.goto(URL+'?lang=th&period=all',wait_until='networkidle');await tp.wait_for_timeout(200)
         ok((await tp.locator('#feedBox .ptag').first.inner_text()).strip() in ('สาธารณะ','แบรนด์','โฆษณา','ข่าว'),'post-type badge is translated')
+        ok(await tp.evaluate("CONFIG.brands.map(b=>b.id+' '+b.color).join('|')")=='Malee #0b8a47|Tipco #f08a1c|Doi Kham #c0392b|if #2b8fd6|Cocomax #7b5cd6|Chaokoh #8d6e3f|Category #8a96a3','brand names and colours come from CONFIG')
+        ok(await tp.evaluate("CONFIG.productLines.map(p=>p.id).join(',')")=='juice,coconut,canned,dairy' and await tp.locator('#fLine').count()==0,'product lines are listed and there is no product-line filter yet')
         await tp.close()
         # mobile overflow
         m=await b.new_page(viewport={'width':375,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
