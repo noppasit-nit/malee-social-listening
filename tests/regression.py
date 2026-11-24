@@ -24,7 +24,10 @@ async def main():
     import csv as _csv
     with open(os.path.join(here,'..','docs','mentions.csv'),encoding='utf-8-sig',newline='') as _f: _csvrows=list(_csv.DictReader(_f))
     _by={r['id']:r for r in D}
-    ok(len(_csvrows)==len(D) and all(_by[c['id']]['link_status']==c.get('link_status') and _by[c['id']]['url']==c['url'] and _by[c['id']]['sentiment']==c['sentiment'] for c in _csvrows),'mentions.csv matches data.json on url, sentiment and link status')
+    ok(all(r.get('post_type') in ('Public','Brand','Paid','News') for r in D),'every mention has one post type')
+    ok(_by['Meeae4b']['post_type']=='Brand' and _by['M96942d']['post_type']=='Brand' and _by['Md9bb40']['post_type']=='Brand','press releases and the Tipco account are Brand')
+    ok(_by['M859204']['post_type']=='Paid' and _by['M9f6556']['post_type']=='Paid' and _by['M30f81b']['post_type']=='News','affiliate posts are Paid and Thai PBS is News')
+    ok(len(_csvrows)==len(D) and all(_by[c['id']]['link_status']==c.get('link_status') and _by[c['id']]['post_type']==c.get('post_type') and _by[c['id']]['url']==c['url'] and _by[c['id']]['sentiment']==c['sentiment'] for c in _csvrows),'mentions.csv matches data.json on url, sentiment, link status and post type')
     def scored(r): return r.get('link_status')!='removed'
     ok(not any('&amp;' in r['text'] for r in D),'no double-escaped entities in text')
     ok(not any(r['date_precision'].startswith('unknown') for r in D),'no undated items')
@@ -324,6 +327,19 @@ async def main():
         ok((await lp.locator('#feedBox .lnote').first.inner_text()).strip()=='ต้องล็อกอิน','Thai login note')
         ok('ไม่นำมาคิดคะแนนสุขภาพ' in await lp.text_content('#method'),'method note explains removed posts and the score')
         await lp.close()
+        tp=await b.new_page(viewport={'width':1280,'height':800})
+        await tp.goto(URL+'?lang=en&period=all',wait_until='networkidle');await tp.wait_for_timeout(300)
+        ok(await tp.locator('#ptype input:checked').count()==4 and await tp.locator('#feedBox .ptag').count()>0,'post-type ticks start on and posts show a type badge')
+        n_all=await cnt(tp)
+        await tp.click('#ptype input[data-pt="Brand"]');await tp.click('#ptype input[data-pt="Paid"]');await tp.wait_for_timeout(200)
+        organic=sum(1 for r in D if r.get('post_type') in ('Public','News'))
+        ok(await cnt(tp)==organic and n_all==len(D),'unticking Brand and Paid leaves organic mentions')
+        ok(await tp.evaluate("health('Malee').n")==sum(1 for r in D if scored(r) and 'Malee' in r['brand'] and r.get('post_type') in ('Public','News')),'health score follows the post-type ticks')
+        await tp.click('#ptype input[data-pt="Brand"]');await tp.click('#ptype input[data-pt="Paid"]');await tp.wait_for_timeout(150)
+        ok(await cnt(tp)==len(D),'ticking every post type restores the full set')
+        await tp.goto(URL+'?lang=th&period=all',wait_until='networkidle');await tp.wait_for_timeout(200)
+        ok((await tp.locator('#feedBox .ptag').first.inner_text()).strip() in ('สาธารณะ','แบรนด์','โฆษณา','ข่าว'),'post-type badge is translated')
+        await tp.close()
         # mobile overflow
         m=await b.new_page(viewport={'width':375,'height':780},is_mobile=True);await m.goto(URL,wait_until='networkidle');await m.wait_for_timeout(600)
         ow=await m.evaluate("document.documentElement.scrollWidth");ok(await m.locator('.rc').count()==5,'recency chips on mobile');ok(ow<=375 and await m.locator('#health svg').is_visible(),f'gauge visible, no horizontal overflow at 375px (scrollWidth {ow})')
